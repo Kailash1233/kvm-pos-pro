@@ -5,11 +5,18 @@ import {
   ReceiptText,
   Package,
   Boxes,
+  History,
+  Truck,
+  Users,
+  Warehouse,
+  BarChart3,
+  Percent,
   Settings as SettingsIcon,
   LogOut,
   ShieldCheck,
 } from "lucide-react";
 import { useApp } from "@/lib/app-context";
+import type { Permission } from "@/lib/services/auth";
 import { LoginScreen } from "./LoginScreen";
 import { SetupWizard } from "./SetupWizard";
 import { cn } from "@/lib/utils";
@@ -17,19 +24,37 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/", label: "Home", icon: LayoutDashboard, key: "F1" },
   { to: "/billing", label: "Billing", icon: ReceiptText, key: "F2" },
+  { to: "/sales", label: "Sales", icon: History, key: "" },
   { to: "/products", label: "Products", icon: Package, key: "F3" },
   { to: "/stock", label: "Stock", icon: Boxes, key: "F4" },
-  { to: "/settings", label: "Settings", icon: SettingsIcon, key: "" },
-] as const;
+  { to: "/purchases", label: "Purchases", icon: Truck, key: "", perm: "purchase.manage" },
+  { to: "/customers", label: "Customers", icon: Users, key: "" },
+  { to: "/suppliers", label: "Suppliers", icon: Warehouse, key: "", perm: "supplier.manage" },
+  { to: "/reports", label: "Reports", icon: BarChart3, key: "", perm: "reports.view" },
+  { to: "/gst", label: "GST", icon: Percent, key: "", perm: "gst.manage" },
+  { to: "/settings", label: "Settings", icon: SettingsIcon, key: "", perm: "settings.manage" },
+] satisfies {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  key: string;
+  perm?: Permission;
+}[];
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { ready, error, needsSetup, user, settings, signOut } = useApp();
+  const { ready, error, needsSetup, user, settings, signOut, allowed } = useApp();
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const items = NAV.filter((n) => !n.perm || allowed(n.perm));
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const map: Record<string, string> = { F1: "/", F2: "/billing", F3: "/products", F4: "/stock" };
+      const map: Record<string, string> = {
+        F1: "/",
+        F2: "/billing",
+        F3: "/products",
+        F4: "/stock",
+      };
       const to = map[e.key];
       if (to) {
         e.preventDefault();
@@ -70,8 +95,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             Offline retail &amp; materials
           </div>
         </div>
-        <nav className="flex-1 space-y-1 p-3">
-          {NAV.map((n) => {
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {items.map((n) => {
             const active = n.to === "/" ? path === "/" : path.startsWith(n.to);
             return (
               <Link

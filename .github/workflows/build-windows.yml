@@ -1,0 +1,62 @@
+name: Build Windows Desktop App
+
+# Builds the real KVM Agencies.exe on an actual Windows runner - no wine,
+# no cross-compilation tricks. Produces:
+#   - a portable single-file .exe (double-click, no installation)
+#   - a traditional installer .exe (Start Menu/Desktop shortcuts, uninstaller)
+# Both are attached to a draft-free GitHub Release so they're easy to find
+# and download directly from the repository's Releases page.
+
+on:
+  push:
+    branches: [claude/shop-app-exe-docs-jgb7il, main]
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build the desktop app bundle (Nitro node-server preset)
+        run: bun run build:desktop
+
+      - name: Package portable .exe and installer .exe
+        run: bunx electron-builder --win portable nsis
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KVM-Agencies-Windows-${{ github.run_number }}
+          path: release/*.exe
+          retention-days: 60
+
+      - name: Publish as a GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-build-${{ github.run_number }}
+          name: KVM Agencies (Windows) - build ${{ github.run_number }}
+          prerelease: true
+          files: release/*.exe
+          body: |
+            Automated Windows build from commit ${{ github.sha }}.
+
+            - **KVM-Agencies-*-Windows.exe** - portable, no installation. Double-click and it opens.
+            - **KVM-Agencies-*-Setup.exe** - installer with Start Menu/Desktop shortcuts and an uninstaller.
+
+            This build is unsigned (no paid code-signing certificate), so Windows
+            SmartScreen will show a "Windows protected your PC" warning the first
+            time it runs. Click **More info -> Run anyway**. This is expected and
+            documented in SOP.md.
