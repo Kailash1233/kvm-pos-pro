@@ -490,7 +490,7 @@ function Billing() {
             <table className="w-full text-sm">
               <thead className="bg-secondary text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2.5 text-left">Item</th>
+                  <th className="min-w-64 px-4 py-2.5 text-left">Item</th>
                   <th className="px-2 py-2.5 text-right">Qty</th>
                   <th className="px-2 py-2.5 text-right">Rate</th>
                   <th className="px-2 py-2.5 text-right">Discount</th>
