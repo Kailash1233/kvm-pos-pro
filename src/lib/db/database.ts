@@ -119,15 +119,32 @@ export function insert(sql: string, params: Param[] = []): number {
  * Runs everything inside a single SQLite transaction.
  * Any thrown error rolls the whole thing back - never a half-saved bill.
  */
+let txDepth = 0;
+
+/**
+ * Runs work in one all-or-nothing transaction. Nested calls join the
+ * outermost transaction, so a service can safely reuse another service.
+ */
 export function transaction<T>(fn: () => T): T {
   const database = getDb();
+  if (txDepth > 0) {
+    txDepth++;
+    try {
+      return fn();
+    } finally {
+      txDepth--;
+    }
+  }
   database.run("BEGIN");
+  txDepth = 1;
   try {
     const result = fn();
     database.run("COMMIT");
+    txDepth = 0;
     schedulePersist();
     return result;
   } catch (err) {
+    txDepth = 0;
     try {
       database.run("ROLLBACK");
     } catch {
@@ -136,6 +153,7 @@ export function transaction<T>(fn: () => T): T {
     throw err;
   }
 }
+
 
 export const nowIso = () => new Date().toISOString();
 export const todayIso = () => new Date().toISOString().slice(0, 10);
