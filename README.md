@@ -3034,3 +3034,55 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Documentation
+
+- **`features.md`** — what the application does today, screen by screen,
+  and what's honestly still missing.
+- **`DATABASE.md`** — the SQLite schema, the money/quantity conventions,
+  and the accounting rules (transactions, derived balances, immutable
+  history) the whole app is built around.
+- **`SOP.md`** — a plain-language guide for shop staff: installing the app,
+  making a sale, returns, purchases, backups, and staff accounts.
+
+## Building the Windows desktop app (`KVM Agencies.exe`)
+
+The app ships as a normal Electron desktop app. The **same production
+build** that powers the hosted web preview runs the show — it's built with
+Nitro's `node-server` preset instead of the Cloudflare preset used for the
+web preview, then Electron runs that server as a background child process
+bound to `127.0.0.1` only (never reachable from the network) and opens a
+plain window pointed at it. There is no browser, no address bar, and no
+visible terminal for the person using it.
+
+```sh
+npm i
+npm run build:desktop          # builds .output/ (the app server + static assets)
+npx electron-builder --win portable nsis
+```
+
+This produces, in `release/`:
+
+- **`KVM-Agencies-<version>-Windows.exe`** — portable. No installation, no
+  admin rights. Double-click and it opens.
+- **`KVM-Agencies-<version>-Setup.exe`** — a traditional installer with
+  Start Menu/Desktop shortcuts and an uninstaller.
+
+Both are built from any machine (Linux, macOS, or Windows) — cross-building
+the Windows target from Linux needs `wine` installed
+(`apt-get install wine wine32:i386` on Debian/Ubuntu, or just build directly
+on Windows/CI where none of that is needed). A GitHub Actions workflow
+(`.github/workflows/build-windows.yml`) builds it on a real Windows runner
+on every push and publishes both `.exe` files as a GitHub Release — the
+most reliable way to get a verified build without a local wine setup.
+
+**Neither `.exe` is code-signed** (that needs a paid certificate), so
+Windows SmartScreen shows a one-time "Windows protected your PC" warning —
+click **More info → Run anyway**. This is expected and is explained in
+`SOP.md` for shop staff.
+
+Where the installed app keeps its data: `%APPDATA%\KVM Agencies\` (never
+the Documents folder, since Documents is commonly OneDrive-synced on
+Windows and that would risk an active sync touching the live database
+file). See `DATABASE.md` for the full folder layout and `SOP.md` for
+backup/restore instructions.
