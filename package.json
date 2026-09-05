@@ -105,6 +105,7 @@
     "appId": "com.kvmagencies.pos",
     "productName": "KVM Agencies",
     "copyright": "KVM Agencies",
+    "publish": null,
     "directories": {
       "output": "release",
       "buildResources": "build"
