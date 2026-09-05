@@ -34,7 +34,7 @@ jobs:
         run: bun run build:desktop
 
       - name: Package portable .exe and installer .exe
-        run: bunx electron-builder --win portable nsis
+        run: bunx electron-builder --win portable nsis --publish never
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
