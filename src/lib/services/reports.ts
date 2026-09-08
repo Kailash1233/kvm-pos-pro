@@ -79,7 +79,11 @@ export interface RangeFilter {
 }
 
 function rangeClause(f: RangeFilter, alias = "s") {
-  const where = [`${alias}.sale_date >= ?`, `${alias}.sale_date <= ?`, `${alias}.status = 'ACTIVE'`];
+  const where = [
+    `${alias}.sale_date >= ?`,
+    `${alias}.sale_date <= ?`,
+    `${alias}.status = 'ACTIVE'`,
+  ];
   const params: (string | number)[] = [f.from, f.to];
   if (f.customerId) {
     where.push(`${alias}.customer_id = ?`);
@@ -265,11 +269,13 @@ export function cancelledBills(f: RangeFilter) {
 
 export function stockReport(lowOnly = false) {
   return all<{
+    id: number;
     product_number: string;
     name: string;
     category: string | null;
     brand: string | null;
     unit: string;
+    image: string | null;
     stock: number;
     min_stock: number;
     purchase_price: number;
@@ -277,7 +283,7 @@ export function stockReport(lowOnly = false) {
     value: number;
   }>(
     `SELECT * FROM (
-       SELECT p.product_number, p.name, p.category, p.brand, p.unit, p.min_stock,
+       SELECT p.id, p.product_number, p.name, p.category, p.brand, p.unit, p.min_stock, p.image,
               p.purchase_price, p.retail_price,
               COALESCE((SELECT SUM(qty) FROM stock_movements sm WHERE sm.product_id = p.id),0) AS stock,
               COALESCE((SELECT SUM(qty) FROM stock_movements sm WHERE sm.product_id = p.id),0)

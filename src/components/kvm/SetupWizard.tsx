@@ -29,8 +29,13 @@ export function SetupWizard() {
     invoicePrefix: "KVM",
     invoiceFooter: "Goods once sold will not be taken back. Subject to Chengalpattu jurisdiction.",
   });
-  const [owner, setOwner] = useState({ fullName: "", username: "owner", password: "", confirm: "" });
-  const [withDemo, setWithDemo] = useState(true);
+  const [owner, setOwner] = useState({
+    fullName: "",
+    username: "owner",
+    password: "",
+    confirm: "",
+  });
+  const [withDemo, setWithDemo] = useState(false);
 
   function next() {
     setError(null);
@@ -104,10 +109,16 @@ export function SetupWizard() {
               />
             </Field>
             <Field label="Phone">
-              <Input value={biz.phone} onChange={(e) => setBiz({ ...biz, phone: e.target.value })} />
+              <Input
+                value={biz.phone}
+                onChange={(e) => setBiz({ ...biz, phone: e.target.value })}
+              />
             </Field>
             <Field label="Email (optional)">
-              <Input value={biz.email} onChange={(e) => setBiz({ ...biz, email: e.target.value })} />
+              <Input
+                value={biz.email}
+                onChange={(e) => setBiz({ ...biz, email: e.target.value })}
+              />
             </Field>
             <Field label="GSTIN">
               <Input
@@ -117,7 +128,10 @@ export function SetupWizard() {
             </Field>
             <div className="grid grid-cols-3 gap-3">
               <Field label="State" className="col-span-2">
-                <Input value={biz.state} onChange={(e) => setBiz({ ...biz, state: e.target.value })} />
+                <Input
+                  value={biz.state}
+                  onChange={(e) => setBiz({ ...biz, state: e.target.value })}
+                />
               </Field>
               <Field label="Code">
                 <Input
@@ -179,21 +193,27 @@ export function SetupWizard() {
 
         {step === 3 ? (
           <div className="mt-6 space-y-4">
-            <div className="flex items-start justify-between gap-6 rounded-md border border-border p-4">
-              <div>
-                <div className="font-medium">Start with sample data</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Adds 30 building material items, 10 customers, 5 suppliers and a few example bills
-                  so you can practise. You can clear it later from Settings.
-                </p>
-              </div>
-              <Switch checked={withDemo} onCheckedChange={setWithDemo} />
-            </div>
             <div className="rounded-md bg-secondary p-4 text-sm">
               <div className="font-medium">Ready to go</div>
               <p className="mt-1 text-muted-foreground">
-                {biz.businessName} · GSTIN {biz.gstin} · Invoices start with {biz.invoicePrefix}
+                {biz.businessName} · GSTIN {biz.gstin} · Invoices start at {biz.invoicePrefix}-
+                {new Date().getFullYear()}-000001
               </p>
+              <p className="mt-1 text-muted-foreground">
+                Your product list, customers and bills all start empty and ready for KVM's real data
+                — this setup screen only appears once, right now.
+              </p>
+            </div>
+            <div className="flex items-start justify-between gap-6 rounded-md border border-border p-4">
+              <div>
+                <div className="font-medium">Add practice data (optional)</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Off by default. Turning this on adds 30 sample building-material items, 10
+                  customers, 5 suppliers and a few example bills, useful only for trying the app out
+                  before you start entering KVM's own products.
+                </p>
+              </div>
+              <Switch checked={withDemo} onCheckedChange={setWithDemo} />
             </div>
           </div>
         ) : null}
@@ -205,11 +225,7 @@ export function SetupWizard() {
         ) : null}
 
         <div className="mt-8 flex justify-between">
-          <Button
-            variant="ghost"
-            onClick={() => setStep(step - 1)}
-            disabled={step === 1 || busy}
-          >
+          <Button variant="ghost" onClick={() => setStep(step - 1)} disabled={step === 1 || busy}>
             Back
           </Button>
           {step < 3 ? (

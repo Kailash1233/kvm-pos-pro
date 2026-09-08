@@ -118,7 +118,8 @@ export function parseProductWorkbook(fileBytes: ArrayBuffer): ParsedRow[] {
     if (minStock < 0) errors.push("Minimum Stock cannot be negative.");
     if (barcode) {
       if (existingBarcodes.has(barcode)) errors.push(`Barcode ${barcode} already exists.`);
-      else if (seenBarcodes.has(barcode)) errors.push(`Barcode ${barcode} is repeated in this file.`);
+      else if (seenBarcodes.has(barcode))
+        errors.push(`Barcode ${barcode} is repeated in this file.`);
       seenBarcodes.add(barcode);
     }
     if (hsn && !/^\d{4,8}$/.test(hsn)) warnings.push("HSN should be 4 to 8 digits.");
@@ -182,10 +183,17 @@ export async function exportSheets(fileName: string, sheets: SheetData[]) {
   return saveExportFile(fileName, bytes);
 }
 
+/**
+ * A UTF-8 BOM is required for Excel to open the file as UTF-8 rather than
+ * the system's legacy codepage - without it, the rupee sign and other
+ * multi-byte characters show up as mojibake (e.g. "â‚¹" instead of "₹").
+ */
+const UTF8_BOM = "﻿";
+
 export async function exportCsv(fileName: string, rows: Record<string, unknown>[]) {
   const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ Note: "No records" }]);
   const csv = XLSX.utils.sheet_to_csv(ws);
-  return saveExportFile(fileName, new TextEncoder().encode(csv));
+  return saveExportFile(fileName, new TextEncoder().encode(UTF8_BOM + csv));
 }
 
 export function productExportRows() {

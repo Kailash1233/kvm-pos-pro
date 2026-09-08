@@ -55,8 +55,23 @@ export async function persist(): Promise<void> {
 export function schedulePersist() {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
+    saveTimer = null;
     void persist();
   }, 400);
+}
+
+/**
+ * Immediately writes if a debounced save is pending. Call this before the
+ * page/tab might disappear (visibilitychange -> hidden, beforeunload) so a
+ * save that was still waiting out its 400ms debounce is never lost.
+ */
+export function flushPersist(): Promise<void> {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    return persist();
+  }
+  return Promise.resolve();
 }
 
 export async function replaceDatabase(bytes: Uint8Array): Promise<void> {
@@ -153,7 +168,6 @@ export function transaction<T>(fn: () => T): T {
     throw err;
   }
 }
-
 
 export const nowIso = () => new Date().toISOString();
 export const todayIso = () => new Date().toISOString().slice(0, 10);

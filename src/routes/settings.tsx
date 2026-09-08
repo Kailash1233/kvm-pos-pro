@@ -179,6 +179,15 @@ function Settings() {
           </>
         }
       />
+      <div className="max-w-3xl px-6 pt-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Business Setup
+        </h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          These are the same details you entered during first-time setup. Change them here any time
+          — the setup screen only ever appears once, the first time the app is opened.
+        </p>
+      </div>
       <div className="grid max-w-3xl gap-4 p-6 md:grid-cols-2">
         <Field label="Shop name" className="md:col-span-2">
           <Input

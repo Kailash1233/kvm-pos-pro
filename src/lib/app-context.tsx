@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { openDatabase, persist } from "./db/database";
+import { openDatabase, flushPersist } from "./db/database";
 import { getSettings, saveSettings, type BusinessSettings } from "./services/settings";
 import { can, type AppUser, type Permission, type Role } from "./services/auth";
 import { userCount } from "./services/auth";
@@ -72,11 +72,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const handler = () => {
-      void persist();
+    // A debounced save waiting out its 400ms window can be lost if the tab
+    // is closed/reloaded/hidden right after an action - flush it eagerly on
+    // every signal that the page might be about to disappear. visibilitychange
+    // fires reliably (including in sandboxed preview iframes where beforeunload
+    // async work is sometimes killed before it completes), so it's the primary
+    // signal; beforeunload/pagehide are extra safety nets.
+    const flush = () => {
+      void flushPersist();
     };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+    };
   }, []);
 
   const refresh = useCallback(() => {

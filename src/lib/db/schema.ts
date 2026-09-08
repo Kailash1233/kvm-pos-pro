@@ -5,7 +5,7 @@
  * Financial records are never physically deleted - they are cancelled/voided.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const MIGRATIONS: { version: number; sql: string }[] = [
   {
@@ -326,6 +326,12 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
+`,
+  },
+  {
+    version: 2,
+    sql: `
+ALTER TABLE products ADD COLUMN image TEXT;
 `,
   },
 ];
