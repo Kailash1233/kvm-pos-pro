@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/kvm/PageHeader";
+import { ProductImage } from "@/components/kvm/ProductImage";
 import { Button } from "@/components/ui/button";
 import { useApp } from "@/lib/app-context";
 import { stockReport, stockValue } from "@/lib/services/reports";
@@ -59,7 +60,8 @@ function Stock() {
           <table className="w-full text-sm">
             <thead className="bg-secondary text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="px-4 py-2.5 text-left">Number</th>
+                <th className="px-4 py-2.5 text-left"></th>
+                <th className="px-2 py-2.5 text-left">Number</th>
                 <th className="px-2 py-2.5 text-left">Item</th>
                 <th className="px-2 py-2.5 text-right">In stock</th>
                 <th className="px-2 py-2.5 text-right">Minimum</th>
@@ -69,14 +71,17 @@ function Stock() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-16 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-16 text-center text-muted-foreground">
                     {lowOnly ? "Nothing is below its minimum level." : "No items yet."}
                   </td>
                 </tr>
               ) : (
                 rows.map((r) => (
                   <tr key={r.product_number} className="border-t border-border">
-                    <td className="num px-4 py-2 text-left">{r.product_number}</td>
+                    <td className="px-4 py-2">
+                      <ProductImage src={r.image} alt={r.name} size="sm" />
+                    </td>
+                    <td className="num px-2 py-2 text-left">{r.product_number}</td>
                     <td className="px-2 py-2">
                       <div className="font-medium">{r.name}</div>
                       <div className="text-xs text-muted-foreground">

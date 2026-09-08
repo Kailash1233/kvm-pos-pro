@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/kvm/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { rupees, formatQty } from "@/lib/money";
+import { rupees, formatQty, toRupeeNumber } from "@/lib/money";
 import {
   gstSalesRegister,
   gstPurchaseRegister,
@@ -113,11 +113,11 @@ function SalesRegister({ filter }: { filter: RangeFilter }) {
     Date: r.sale_date,
     Customer: r.customer_name,
     GSTIN: r.customer_gstin ?? "-",
-    Taxable: (r.taxable / 100).toFixed(2),
-    CGST: (r.cgst / 100).toFixed(2),
-    SGST: (r.sgst / 100).toFixed(2),
-    IGST: (r.igst / 100).toFixed(2),
-    Total: (r.total / 100).toFixed(2),
+    Taxable: toRupeeNumber(r.taxable),
+    CGST: toRupeeNumber(r.cgst),
+    SGST: toRupeeNumber(r.sgst),
+    IGST: toRupeeNumber(r.igst),
+    Total: toRupeeNumber(r.total),
   }));
 
   const totals = rows.reduce(
@@ -208,11 +208,11 @@ function PurchaseRegister({ filter }: { filter: RangeFilter }) {
     "Supplier Invoice": r.supplier_invoice ?? "-",
     Date: r.purchase_date,
     Supplier: r.supplier_name,
-    Taxable: (r.taxable / 100).toFixed(2),
-    CGST: (r.cgst / 100).toFixed(2),
-    SGST: (r.sgst / 100).toFixed(2),
-    IGST: (r.igst / 100).toFixed(2),
-    Total: (r.total / 100).toFixed(2),
+    Taxable: toRupeeNumber(r.taxable),
+    CGST: toRupeeNumber(r.cgst),
+    SGST: toRupeeNumber(r.sgst),
+    IGST: toRupeeNumber(r.igst),
+    Total: toRupeeNumber(r.total),
   }));
 
   return (
@@ -278,10 +278,10 @@ function HsnSummary({ filter }: { filter: RangeFilter }) {
     Description: r.description,
     "GST %": r.gst_rate,
     Qty: formatQty(r.qty),
-    Taxable: (r.taxable / 100).toFixed(2),
-    CGST: (r.cgst / 100).toFixed(2),
-    SGST: (r.sgst / 100).toFixed(2),
-    IGST: (r.igst / 100).toFixed(2),
+    Taxable: toRupeeNumber(r.taxable),
+    CGST: toRupeeNumber(r.cgst),
+    SGST: toRupeeNumber(r.sgst),
+    IGST: toRupeeNumber(r.igst),
   }));
 
   return (
@@ -342,11 +342,11 @@ function TaxSummary({ filter }: { filter: RangeFilter }) {
 
   const exportRows = rows.map((r) => ({
     "GST %": r.gst_rate,
-    Taxable: (r.taxable / 100).toFixed(2),
-    CGST: (r.cgst / 100).toFixed(2),
-    SGST: (r.sgst / 100).toFixed(2),
-    IGST: (r.igst / 100).toFixed(2),
-    Total: (r.total / 100).toFixed(2),
+    Taxable: toRupeeNumber(r.taxable),
+    CGST: toRupeeNumber(r.cgst),
+    SGST: toRupeeNumber(r.sgst),
+    IGST: toRupeeNumber(r.igst),
+    Total: toRupeeNumber(r.total),
   }));
 
   return (

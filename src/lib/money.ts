@@ -16,6 +16,11 @@ export function toRupees(paise: number): number {
   return (paise || 0) / 100;
 }
 
+/** A plain, spreadsheet-safe rupee number (2 decimals, no float drift) - for Excel/CSV export, never for display. */
+export function toRupeeNumber(paise: number): number {
+  return Number(toRupees(paise).toFixed(2));
+}
+
 export function toQty(q: number | string): number {
   const n = typeof q === "string" ? parseFloat(q || "0") : q;
   if (!isFinite(n)) return 0;

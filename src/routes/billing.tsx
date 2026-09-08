@@ -1,8 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Printer, Save, Search, Trash2, PauseCircle, X } from "lucide-react";
+import {
+  Plus,
+  Printer,
+  Save,
+  Search,
+  Trash2,
+  PauseCircle,
+  X,
+  Boxes,
+  Droplets,
+  Layers,
+  PaintBucket,
+  Zap,
+  Wrench,
+  ShowerHead,
+  Tag,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/kvm/PageHeader";
+import { ProductImage } from "@/components/kvm/ProductImage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +28,8 @@ import { formatQty, fromQty, rupees, toPaise, toQty, toRupees } from "@/lib/mone
 import {
   priceForCustomerType,
   searchProducts,
+  listProducts,
+  listCategories,
   type ProductWithStock,
 } from "@/lib/services/products";
 import { listCustomers, getCustomer, type CustomerWithBalance } from "@/lib/services/customers";
@@ -362,9 +381,7 @@ function Billing() {
                       <div className="font-medium">{customer.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {customer.type} · Due {rupees(customer.outstanding)}
-                        {customer.credit_limit
-                          ? ` · Limit ${rupees(customer.credit_limit)}`
-                          : ""}
+                        {customer.credit_limit ? ` · Limit ${rupees(customer.credit_limit)}` : ""}
                       </div>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => setCustomer(null)}>
@@ -383,6 +400,10 @@ function Billing() {
                       }}
                       onFocus={() => setShowCustomers(true)}
                     />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      In a hurry? Leave this blank — the bill saves as{" "}
+                      <span className="font-medium">Walk-in Customer</span>, no name needed.
+                    </p>
                     {showCustomers && customerMatches.length ? (
                       <ul className="panel absolute z-20 mt-1 max-h-60 w-full overflow-auto p-1">
                         {customerMatches.map((c) => (
@@ -484,6 +505,8 @@ function Billing() {
                 ) : null}
               </div>
             </div>
+
+            <CategoryQuickAdd onAdd={addProduct} customerType={customer?.type} />
           </div>
 
           <div className="panel overflow-hidden">
@@ -729,6 +752,125 @@ function Row({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="num">{value}</dd>
+    </div>
+  );
+}
+
+/** Recognisable icons for the common construction-materials categories; anything else gets a plain tag. */
+const CATEGORY_ICONS: Record<string, typeof Tag> = {
+  cement: Boxes,
+  plumbing: Droplets,
+  steel: Layers,
+  paint: PaintBucket,
+  electrical: Zap,
+  hardware: Wrench,
+  sanitary: ShowerHead,
+};
+function categoryIcon(name: string) {
+  return CATEGORY_ICONS[name.trim().toLowerCase()] ?? Tag;
+}
+
+/**
+ * Tap-to-add flow for cashiers in a hurry: pick a category by icon, then
+ * tap a product tile (with photo) to add it - no typing required at all.
+ * Sits alongside the text search, which stays the fastest path once a
+ * cashier knows the product number.
+ */
+function CategoryQuickAdd({
+  onAdd,
+  customerType,
+}: {
+  onAdd: (p: ProductWithStock) => void;
+  customerType: string | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  const categories = useMemo(() => {
+    if (!open) return [];
+    try {
+      return listCategories();
+    } catch {
+      return [];
+    }
+  }, [open]);
+
+  const items = useMemo(() => {
+    if (!activeCategory) return [];
+    try {
+      return listProducts({ category: activeCategory, limit: 60 });
+    } catch {
+      return [];
+    }
+  }, [activeCategory]);
+
+  return (
+    <div className="mt-4 border-t border-border pt-3">
+      <button
+        type="button"
+        className="text-sm font-medium text-primary hover:underline"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? "Hide category browser" : "Browse by category (tap to add)"}
+      </button>
+
+      {open ? (
+        <div className="mt-3 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {categories.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No categories yet.</p>
+            ) : (
+              categories.map((c) => {
+                const Icon = categoryIcon(c);
+                const active = activeCategory === c;
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setActiveCategory(active ? null : c)}
+                    className={`flex flex-col items-center gap-1 rounded-lg border px-4 py-3 text-xs font-medium transition-colors ${
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card hover:bg-secondary"
+                    }`}
+                  >
+                    <Icon className="h-6 w-6" />
+                    {c}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {activeCategory ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {items.length === 0 ? (
+                <p className="col-span-full text-sm text-muted-foreground">
+                  No items in {activeCategory} yet.
+                </p>
+              ) : (
+                items.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => onAdd(p)}
+                    className="flex items-center gap-2 rounded-lg border border-border bg-card p-2 text-left hover:border-primary hover:bg-secondary/60"
+                  >
+                    <ProductImage src={p.image} alt={p.name} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{p.name}</div>
+                      <div className="text-xs text-muted-foreground">{p.product_number}</div>
+                      <div className="num text-xs font-medium">
+                        {rupees(priceForCustomerType(p, (customerType as never) ?? "Retail"))}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

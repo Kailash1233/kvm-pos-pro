@@ -475,8 +475,8 @@ function CustomerProfileDialog({
       Date: l.entry_date,
       Type: l.type,
       Reference: l.ref_label ?? "",
-      Debit: l.debit ? (l.debit / 100).toFixed(2) : "",
-      Credit: l.credit ? (l.credit / 100).toFixed(2) : "",
+      Debit: l.debit ? Number((l.debit / 100).toFixed(2)) : "",
+      Credit: l.credit ? Number((l.credit / 100).toFixed(2)) : "",
       Notes: l.notes ?? "",
     }));
   }

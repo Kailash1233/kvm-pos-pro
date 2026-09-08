@@ -1,4 +1,13 @@
-import { all, insert, nowIso, one, run, schedulePersist, scalar, transaction } from "../db/database";
+import {
+  all,
+  insert,
+  nowIso,
+  one,
+  run,
+  schedulePersist,
+  scalar,
+  transaction,
+} from "../db/database";
 import { logAudit } from "./audit";
 
 export interface Product {
@@ -17,6 +26,8 @@ export interface Product {
   dealer_price: number;
   contractor_price: number;
   min_stock: number;
+  /** A compact data: URL (JPEG, resized client-side) or null if no photo was added. */
+  image: string | null;
   active: number;
   created_at: string;
   updated_at: string;
@@ -122,9 +133,8 @@ export function listProducts(
 
 export function countProducts(includeInactive = false): number {
   return (
-    scalar<number>(
-      `SELECT COUNT(*) FROM products ${includeInactive ? "" : "WHERE active = 1"}`,
-    ) ?? 0
+    scalar<number>(`SELECT COUNT(*) FROM products ${includeInactive ? "" : "WHERE active = 1"}`) ??
+    0
   );
 }
 
@@ -172,6 +182,7 @@ export interface ProductInput {
   dealer_price?: number;
   contractor_price?: number;
   min_stock?: number;
+  image?: string | null;
 }
 
 export function createProduct(
@@ -190,9 +201,9 @@ export function createProduct(
     const ts = nowIso();
     const id = insert(
       `INSERT INTO products(product_number, barcode, name, category, subcategory, brand, unit, hsn,
-        gst_rate, purchase_price, retail_price, dealer_price, contractor_price, min_stock,
+        gst_rate, purchase_price, retail_price, dealer_price, contractor_price, min_stock, image,
         active, created_at, updated_at)
-       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
       [
         num,
         input.barcode?.trim() || null,
@@ -208,6 +219,7 @@ export function createProduct(
         input.dealer_price ?? 0,
         input.contractor_price ?? 0,
         input.min_stock ?? 0,
+        input.image || null,
         ts,
         ts,
       ],
@@ -236,16 +248,16 @@ export function updateProduct(id: number, input: ProductInput, actor: string): v
   const before = getProduct(id);
   if (!before) throw new Error("That product could not be found.");
   const num = input.product_number.trim();
-  const clash = one<{ id: number }>("SELECT id FROM products WHERE product_number = ? AND id <> ?", [
-    num,
-    id,
-  ]);
+  const clash = one<{ id: number }>(
+    "SELECT id FROM products WHERE product_number = ? AND id <> ?",
+    [num, id],
+  );
   if (clash) throw new Error(`Product number ${num} is already used by another product.`);
   transaction(() => {
     run(
       `UPDATE products SET product_number=?, barcode=?, name=?, category=?, subcategory=?, brand=?,
          unit=?, hsn=?, gst_rate=?, purchase_price=?, retail_price=?, dealer_price=?,
-         contractor_price=?, min_stock=?, updated_at=? WHERE id=?`,
+         contractor_price=?, min_stock=?, image=?, updated_at=? WHERE id=?`,
       [
         num,
         input.barcode?.trim() || null,
@@ -261,6 +273,7 @@ export function updateProduct(id: number, input: ProductInput, actor: string): v
         input.dealer_price ?? 0,
         input.contractor_price ?? 0,
         input.min_stock ?? 0,
+        input.image !== undefined ? input.image : before.image,
         nowIso(),
         id,
       ],

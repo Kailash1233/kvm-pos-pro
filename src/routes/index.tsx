@@ -1,18 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  AlertTriangle,
-  ArrowRight,
-  IndianRupee,
-  Package,
-  ReceiptText,
-  Users,
-} from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, ArrowRight, IndianRupee, Package, ReceiptText, Users } from "lucide-react";
 import { useApp, useQueryData } from "@/lib/app-context";
 import { daySummary, stockValue } from "@/lib/services/reports";
 import { lowStockProducts } from "@/lib/services/products";
 import { listSales } from "@/lib/services/sales";
 import { rupees, formatQty, rupeesShort } from "@/lib/money";
 import { PageHeader } from "@/components/kvm/PageHeader";
+import { BillViewDialog } from "@/components/kvm/BillViewDialog";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
@@ -40,6 +35,7 @@ function Home() {
   const stock = useQueryData(() => stockValue());
   const low = useQueryData(() => lowStockProducts(8));
   const recent = useQueryData(() => listSales({ limit: 8 }));
+  const [viewId, setViewId] = useState<number | null>(null);
 
   return (
     <div className="min-h-screen">
@@ -103,8 +99,14 @@ function Home() {
               <table className="w-full text-sm">
                 <tbody>
                   {recent.map((s) => (
-                    <tr key={s.id} className="border-b border-border/60 last:border-0">
-                      <td className="px-5 py-2.5 font-medium">{s.invoice_number}</td>
+                    <tr
+                      key={s.id}
+                      onClick={() => setViewId(s.id)}
+                      className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-secondary/60"
+                    >
+                      <td className="px-5 py-2.5 font-medium text-primary hover:underline">
+                        {s.invoice_number}
+                      </td>
                       <td className="px-2 py-2.5 text-muted-foreground">{s.customer_name}</td>
                       <td className="px-2 py-2.5 text-xs text-muted-foreground">
                         {new Date(s.created_at).toLocaleTimeString("en-IN", {
@@ -169,6 +171,8 @@ function Home() {
           </section>
         </div>
       </div>
+
+      <BillViewDialog saleId={viewId} onClose={() => setViewId(null)} />
     </div>
   );
 }
