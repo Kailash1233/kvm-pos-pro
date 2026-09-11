@@ -71,11 +71,23 @@ interface CartLine {
   discount: number; // paise
 }
 
+/**
+ * Old-school billing convention: typing "3*cement" (or "3x...") in the
+ * search box searches for "cement" but adds 3 of whatever gets picked,
+ * so a cashier never has to touch the qty box for a multi-unit sale.
+ */
+function parseQtyPrefix(raw: string): { qty: number; query: string } {
+  const m = raw.match(/^(\d+(?:\.\d+)?)\s*[x*]\s*(.+)$/i);
+  const qty = m ? Number(m[1]) : NaN;
+  return qty > 0 ? { qty, query: m![2]! } : { qty: 1, query: raw };
+}
+
 function Billing() {
   const { user, settings, refresh, version } = useApp();
   const [customer, setCustomer] = useState<CustomerWithBalance | null>(null);
   const [customerTerm, setCustomerTerm] = useState("");
   const [showCustomers, setShowCustomers] = useState(false);
+  const [customerHighlight, setCustomerHighlight] = useState(0);
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<ProductWithStock[]>([]);
   const [highlight, setHighlight] = useState(0);
@@ -91,6 +103,7 @@ function Billing() {
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const customerRef = useRef<HTMLInputElement>(null);
 
   const held = useMemo(() => {
     try {
@@ -108,7 +121,7 @@ function Billing() {
   useEffect(() => {
     const id = window.setTimeout(() => {
       try {
-        setResults(searchProducts(term, { limit: 12 }));
+        setResults(searchProducts(parseQtyPrefix(term).query, { limit: 12 }));
         setHighlight(0);
       } catch {
         setResults([]);
@@ -125,6 +138,10 @@ function Billing() {
       return [];
     }
   }, [customerTerm, showCustomers, version]);
+
+  useEffect(() => {
+    setCustomerHighlight(0);
+  }, [customerMatches]);
 
   const interstate =
     !!customer?.state_code && !!settings.stateCode && customer.state_code !== settings.stateCode;
@@ -155,19 +172,19 @@ function Billing() {
   const remaining = total - entered;
 
   const addProduct = useCallback(
-    (p: ProductWithStock) => {
+    (p: ProductWithStock, qty: number = toQty(1)) => {
       setCart((prev) => {
         const at = prev.findIndex((l) => l.product.id === p.id);
         if (at >= 0) {
           const next = [...prev];
-          next[at] = { ...next[at]!, qty: next[at]!.qty + toQty(1) };
+          next[at] = { ...next[at]!, qty: next[at]!.qty + qty };
           return next;
         }
         return [
           ...prev,
           {
             product: p,
-            qty: toQty(1),
+            qty,
             price: priceForCustomerType(p, (customer?.type as never) ?? "Retail"),
             discount: 0,
           },
@@ -179,8 +196,47 @@ function Billing() {
     [customer],
   );
 
+  const selectCustomer = useCallback((c: CustomerWithBalance) => {
+    setCustomer(c);
+    setShowCustomers(false);
+    setCustomerTerm("");
+    setCart((prev) =>
+      prev.map((l) => ({ ...l, price: priceForCustomerType(l.product, c.type as never) })),
+    );
+    searchRef.current?.focus();
+  }, []);
+
   function updateLine(i: number, patch: Partial<CartLine>) {
     setCart((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  }
+
+  /**
+   * Excel-style keyboard nav for the cart grid: Up/Down moves to the same
+   * column in the next/previous row, Enter moves right (Qty -> Rate ->
+   * Discount -> back to search), Esc jumps straight back to search.
+   */
+  const CART_COLS = ["qty", "rate", "discount"] as const;
+  function cartCellKeyDown(
+    e: React.KeyboardEvent<HTMLInputElement>,
+    row: number,
+    col: (typeof CART_COLS)[number],
+  ) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      document.getElementById(`cart-${col}-${row + 1}`)?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (row === 0) searchRef.current?.focus();
+      else document.getElementById(`cart-${col}-${row - 1}`)?.focus();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const nextCol = CART_COLS[CART_COLS.indexOf(col) + 1];
+      if (nextCol) document.getElementById(`cart-${nextCol}-${row}`)?.focus();
+      else searchRef.current?.focus();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      searchRef.current?.focus();
+    }
   }
 
   function resetBill() {
@@ -282,13 +338,36 @@ function Billing() {
       } else if (e.key === "F8") {
         e.preventDefault();
         void save(false);
+      } else if (e.key === "F5") {
+        e.preventDefault();
+        setCustomer(null);
+        setTimeout(() => customerRef.current?.focus(), 0);
+      } else if (e.key === "F6") {
+        e.preventDefault();
+        hold();
+      } else if (e.key === "F7") {
+        e.preventDefault();
+        resetBill();
+      } else if (e.altKey && e.key === "1") {
+        e.preventDefault();
+        setPayments({ CASH: String(toRupees(total)), UPI: "", CARD: "", CREDIT: "", OTHER: "" });
+      } else if (e.altKey && e.key === "2") {
+        e.preventDefault();
+        setPayments({ CASH: "", UPI: String(toRupees(total)), CARD: "", CREDIT: "", OTHER: "" });
+      } else if (e.altKey && e.key === "3") {
+        if (!customer) return;
+        e.preventDefault();
+        setPayments({ CASH: "", UPI: "", CARD: "", CREDIT: String(toRupees(total)), OTHER: "" });
       } else if (e.key === "Escape") {
         setShowCustomers(false);
+        setTerm("");
+        searchRef.current?.focus();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [save]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [save, total, customer]);
 
   function hold() {
     if (!cart.length || !user) return;
@@ -340,7 +419,7 @@ function Billing() {
     <div className="min-h-screen">
       <PageHeader
         title="Billing"
-        subtitle="Search a product, press Enter to add. F8 saves, F9 saves and prints."
+        subtitle="Search a product, press Enter to add. Press ? for every shortcut, start to print."
         actions={
           <>
             {held.length ? (
@@ -359,9 +438,11 @@ function Billing() {
             ) : null}
             <Button variant="outline" onClick={hold} disabled={!cart.length}>
               <PauseCircle className="mr-1.5 h-4 w-4" /> Hold
+              <span className="kbd-hint ml-2">F6</span>
             </Button>
             <Button variant="outline" onClick={resetBill} disabled={!cart.length}>
               <X className="mr-1.5 h-4 w-4" /> Clear
+              <span className="kbd-hint ml-2">F7</span>
             </Button>
           </>
         }
@@ -373,7 +454,7 @@ function Billing() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="relative">
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Customer
+                  Customer <span className="kbd-hint ml-1">F5</span>
                 </Label>
                 {customer ? (
                   <div className="mt-1.5 flex items-center justify-between rounded-md border border-border px-3 py-2">
@@ -384,13 +465,21 @@ function Billing() {
                         {customer.credit_limit ? ` · Limit ${rupees(customer.credit_limit)}` : ""}
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => setCustomer(null)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setCustomer(null);
+                        setTimeout(() => customerRef.current?.focus(), 0);
+                      }}
+                    >
                       Change
                     </Button>
                   </div>
                 ) : (
                   <>
                     <Input
+                      ref={customerRef}
                       className="mt-1.5"
                       placeholder="Walk-in customer — type a name or phone"
                       value={customerTerm}
@@ -399,6 +488,24 @@ function Billing() {
                         setShowCustomers(true);
                       }}
                       onFocus={() => setShowCustomers(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setCustomerHighlight((h) => Math.min(h + 1, customerMatches.length - 1));
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setCustomerHighlight((h) => Math.max(h - 1, 0));
+                        } else if (e.key === "Enter") {
+                          e.preventDefault();
+                          const c = customerMatches[customerHighlight];
+                          if (c) selectCustomer(c);
+                        } else if (e.key === "Escape") {
+                          e.preventDefault();
+                          setShowCustomers(false);
+                          setCustomerTerm("");
+                          searchRef.current?.focus();
+                        }
+                      }}
                     />
                     <p className="mt-1 text-xs text-muted-foreground">
                       In a hurry? Leave this blank — the bill saves as{" "}
@@ -406,21 +513,14 @@ function Billing() {
                     </p>
                     {showCustomers && customerMatches.length ? (
                       <ul className="panel absolute z-20 mt-1 max-h-60 w-full overflow-auto p-1">
-                        {customerMatches.map((c) => (
+                        {customerMatches.map((c, i) => (
                           <li key={c.id}>
                             <button
-                              className="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm hover:bg-secondary"
-                              onClick={() => {
-                                setCustomer(c);
-                                setShowCustomers(false);
-                                setCustomerTerm("");
-                                setCart((prev) =>
-                                  prev.map((l) => ({
-                                    ...l,
-                                    price: priceForCustomerType(l.product, c.type as never),
-                                  })),
-                                );
-                              }}
+                              className={`flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+                                i === customerHighlight ? "bg-secondary" : "hover:bg-secondary"
+                              }`}
+                              onMouseEnter={() => setCustomerHighlight(i)}
+                              onClick={() => selectCustomer(c)}
                             >
                               <span>
                                 {c.name}
@@ -462,21 +562,27 @@ function Billing() {
                       } else if (e.key === "Enter") {
                         e.preventDefault();
                         const p = results[highlight];
-                        if (p) addProduct(p);
+                        if (p) addProduct(p, toQty(parseQtyPrefix(term).qty));
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        setTerm("");
                       }
                     }}
                   />
                 </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Tip: type <span className="kbd-hint">3*item</span> to add 3 at once.
+                </p>
                 {term && results.length ? (
                   <ul className="panel absolute z-20 mt-1 max-h-72 w-full overflow-auto p-1">
                     {results.map((p, i) => (
                       <li key={p.id}>
                         <button
-                          className={`flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm ${
+                          className={`flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
                             i === highlight ? "bg-secondary" : "hover:bg-secondary"
                           }`}
                           onMouseEnter={() => setHighlight(i)}
-                          onClick={() => addProduct(p)}
+                          onClick={() => addProduct(p, toQty(parseQtyPrefix(term).qty))}
                         >
                           <span>
                             <span className="font-medium">{p.name}</span>
@@ -547,25 +653,31 @@ function Billing() {
                         </td>
                         <td className="px-2 py-2">
                           <Input
+                            id={`cart-qty-${i}`}
                             className="num h-9 w-24"
                             value={String(fromQty(l.qty))}
                             onChange={(e) => updateLine(i, { qty: toQty(e.target.value || 0) })}
+                            onKeyDown={(e) => cartCellKeyDown(e, i, "qty")}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
+                            id={`cart-rate-${i}`}
                             className="num h-9 w-24"
                             value={String(toRupees(l.price))}
                             onChange={(e) => updateLine(i, { price: toPaise(e.target.value || 0) })}
+                            onKeyDown={(e) => cartCellKeyDown(e, i, "rate")}
                           />
                         </td>
                         <td className="px-2 py-2">
                           <Input
+                            id={`cart-discount-${i}`}
                             className="num h-9 w-24"
                             value={String(toRupees(l.discount))}
                             onChange={(e) =>
                               updateLine(i, { discount: toPaise(e.target.value || 0) })
                             }
+                            onKeyDown={(e) => cartCellKeyDown(e, i, "discount")}
                           />
                         </td>
                         <td className="num px-2 py-2">
@@ -639,6 +751,12 @@ function Billing() {
                     placeholder="0"
                     value={payments[m]}
                     onChange={(e) => setPayments({ ...payments, [m]: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && remaining === 0 && cart.length) {
+                        e.preventDefault();
+                        void save(false);
+                      }
+                    }}
                   />
                 </div>
               ))}
@@ -658,6 +776,7 @@ function Billing() {
                 }
               >
                 Full cash
+                <span className="kbd-hint ml-2">Alt+1</span>
               </Button>
               <Button
                 variant="secondary"
@@ -673,6 +792,7 @@ function Billing() {
                 }
               >
                 Full UPI
+                <span className="kbd-hint ml-2">Alt+2</span>
               </Button>
               <Button
                 variant="secondary"
@@ -689,6 +809,7 @@ function Billing() {
                 }
               >
                 Full credit
+                <span className="kbd-hint ml-2">Alt+3</span>
               </Button>
             </div>
             <p
@@ -808,7 +929,7 @@ function CategoryQuickAdd({
     <div className="mt-4 border-t border-border pt-3">
       <button
         type="button"
-        className="text-sm font-medium text-primary hover:underline"
+        className="rounded text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         onClick={() => setOpen((o) => !o)}
       >
         {open ? "Hide category browser" : "Browse by category (tap to add)"}
@@ -828,7 +949,7 @@ function CategoryQuickAdd({
                     key={c}
                     type="button"
                     onClick={() => setActiveCategory(active ? null : c)}
-                    className={`flex flex-col items-center gap-1 rounded-lg border px-4 py-3 text-xs font-medium transition-colors ${
+                    className={`flex flex-col items-center gap-1 rounded-lg border px-4 py-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
                       active
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-card hover:bg-secondary"
@@ -854,7 +975,7 @@ function CategoryQuickAdd({
                     key={p.id}
                     type="button"
                     onClick={() => onAdd(p)}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-card p-2 text-left hover:border-primary hover:bg-secondary/60"
+                    className="flex items-center gap-2 rounded-lg border border-border bg-card p-2 text-left hover:border-primary hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <ProductImage src={p.image} alt={p.name} size="md" />
                     <div className="min-w-0 flex-1">

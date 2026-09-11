@@ -14,11 +14,13 @@ import {
   Settings as SettingsIcon,
   LogOut,
   ShieldCheck,
+  Keyboard,
 } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import type { Permission } from "@/lib/services/auth";
 import { LoginScreen } from "./LoginScreen";
 import { SetupWizard } from "./SetupWizard";
+import { KeyboardShortcutsProvider, useOpenShortcuts } from "./KeyboardShortcuts";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -87,50 +89,67 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (!user) return <LoginScreen />;
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
-        <div className="border-b border-sidebar-border px-5 py-4">
-          <div className="text-base font-semibold tracking-tight">{settings.businessName}</div>
-          <div className="mt-0.5 text-xs text-sidebar-foreground/60">
-            Offline retail &amp; materials
+    <KeyboardShortcutsProvider>
+      <div className="flex min-h-screen bg-background">
+        <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
+          <div className="border-b border-sidebar-border px-5 py-4">
+            <div className="text-base font-semibold tracking-tight">{settings.businessName}</div>
+            <div className="mt-0.5 text-xs text-sidebar-foreground/60">
+              Offline retail &amp; materials
+            </div>
           </div>
-        </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {items.map((n) => {
-            const active = n.to === "/" ? path === "/" : path.startsWith(n.to);
-            return (
-              <Link
-                key={n.to}
-                to={n.to as "/"}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                  active
-                    ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60",
-                )}
-              >
-                <n.icon className="h-4 w-4" />
-                <span className="flex-1">{n.label}</span>
-                {n.key ? <span className="kbd-hint">{n.key}</span> : null}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="border-t border-sidebar-border p-3">
-          <div className="flex items-center gap-2 px-2 py-1 text-xs text-sidebar-foreground/70">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            {user.full_name} · {user.role}
+          <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+            {items.map((n) => {
+              const active = n.to === "/" ? path === "/" : path.startsWith(n.to);
+              return (
+                <Link
+                  key={n.to}
+                  to={n.to as "/"}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                    active
+                      ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60",
+                  )}
+                >
+                  <n.icon className="h-4 w-4" />
+                  <span className="flex-1">{n.label}</span>
+                  {n.key ? <span className="kbd-hint">{n.key}</span> : null}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="border-t border-sidebar-border p-3">
+            <div className="flex items-center gap-2 px-2 py-1 text-xs text-sidebar-foreground/70">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              {user.full_name} · {user.role}
+            </div>
+            <ShortcutsButton />
+            <button
+              onClick={signOut}
+              className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <LogOut className="h-4 w-4" /> Sign out
+            </button>
           </div>
-          <button
-            onClick={signOut}
-            className="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent/60"
-          >
-            <LogOut className="h-4 w-4" /> Sign out
-          </button>
-        </div>
-      </aside>
-      <main className="min-w-0 flex-1">{children}</main>
-    </div>
+        </aside>
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
+    </KeyboardShortcutsProvider>
+  );
+}
+
+function ShortcutsButton() {
+  const openShortcuts = useOpenShortcuts();
+  return (
+    <button
+      onClick={openShortcuts}
+      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+    >
+      <Keyboard className="h-4 w-4" />
+      <span className="flex-1 text-left">Keyboard shortcuts</span>
+      <span className="kbd-hint">?</span>
+    </button>
   );
 }
 
