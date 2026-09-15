@@ -175,6 +175,7 @@ export function paymentCollection(f: RangeFilter) {
 
 export function gstSalesRegister(f: RangeFilter) {
   const { where, params } = rangeClause(f);
+  where.push("s.gst_applied = 1");
   return all<{
     invoice_number: string;
     sale_date: string;
@@ -226,7 +227,7 @@ export function hsnSummary(f: RangeFilter) {
             SUM(si.qty) AS qty, SUM(si.taxable) AS taxable,
             SUM(si.cgst) AS cgst, SUM(si.sgst) AS sgst, SUM(si.igst) AS igst
      FROM sale_items si JOIN sales s ON s.id = si.sale_id
-     WHERE s.sale_date >= ? AND s.sale_date <= ? AND s.status = 'ACTIVE'
+     WHERE s.sale_date >= ? AND s.sale_date <= ? AND s.status = 'ACTIVE' AND s.gst_applied = 1
      GROUP BY hsn, si.gst_rate ORDER BY hsn`,
     [f.from, f.to],
   );
@@ -244,7 +245,7 @@ export function taxSummary(f: RangeFilter) {
     `SELECT si.gst_rate, SUM(si.taxable) AS taxable, SUM(si.cgst) AS cgst, SUM(si.sgst) AS sgst,
             SUM(si.igst) AS igst, SUM(si.total) AS total
      FROM sale_items si JOIN sales s ON s.id = si.sale_id
-     WHERE s.sale_date >= ? AND s.sale_date <= ? AND s.status = 'ACTIVE'
+     WHERE s.sale_date >= ? AND s.sale_date <= ? AND s.status = 'ACTIVE' AND s.gst_applied = 1
      GROUP BY si.gst_rate ORDER BY si.gst_rate`,
     [f.from, f.to],
   );

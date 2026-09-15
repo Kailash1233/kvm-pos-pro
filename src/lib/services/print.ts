@@ -175,6 +175,7 @@ ${d.outstanding ? `<div style="margin-top:4px"><b>Total outstanding for this cus
 
 export function invoiceHtmlThermal(d: InvoiceData, s: BusinessSettings): string {
   const { sale, items } = d;
+  const gstApplied = sale.gst_applied !== 0;
   const rows = items
     .map(
       (it) => `<tr><td colspan="3">${esc(it.product_name)}</td></tr>
@@ -194,6 +195,7 @@ export function invoiceHtmlThermal(d: InvoiceData, s: BusinessSettings): string 
 <div class="c">${esc(s.address)}</div>
 <div class="c">Ph: ${esc(s.phone)}</div>
 <div class="c">GSTIN: ${esc(s.gstin)}</div>
+${gstApplied ? "" : '<div class="c"><b>NO GST BILL</b></div>'}
 <hr>
 <div>Bill: ${esc(sale.invoice_number)}</div>
 <div>${esc(new Date(sale.created_at).toLocaleString("en-IN"))}</div>
@@ -242,7 +244,8 @@ export function printHtml(html: string): void {
 }
 
 export function printInvoice(d: InvoiceData, s: BusinessSettings): void {
-  printHtml(s.printFormat === "THERMAL" ? invoiceHtmlThermal(d, s) : invoiceHtmlA4(d, s));
+  const title = d.sale.gst_applied === 0 ? "INVOICE (NO GST)" : "TAX INVOICE";
+  printHtml(s.printFormat === "THERMAL" ? invoiceHtmlThermal(d, s) : invoiceHtmlA4(d, s, title));
 }
 
 export { inWords };

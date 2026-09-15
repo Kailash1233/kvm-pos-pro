@@ -3,6 +3,7 @@ import { all, one, transaction } from "../db/database";
 import { toPaise, toQty, toRupees, fromQty } from "../money";
 import { createProduct, ensureLookup, type ProductInput } from "./products";
 import { saveExportFile } from "../db/storage";
+import { fetchImageAsDataUrl } from "../image";
 
 export const TEMPLATE_COLUMNS = [
   "Product Number",
@@ -20,6 +21,7 @@ export const TEMPLATE_COLUMNS = [
   "Opening Stock",
   "Minimum Stock",
   "Barcode",
+  "Image URL",
 ] as const;
 
 const VALID_GST = [0, 0.25, 3, 5, 12, 18, 28];
@@ -42,6 +44,7 @@ export async function downloadTemplate() {
       "Opening Stock": 250,
       "Minimum Stock": 50,
       Barcode: "",
+      "Image URL": "",
     },
   ];
   const ws = XLSX.utils.json_to_sheet(rows, { header: [...TEMPLATE_COLUMNS] });
@@ -53,7 +56,7 @@ export async function downloadTemplate() {
 
 export interface ParsedRow {
   row: number;
-  data: ProductInput & { openingStock: number };
+  data: ProductInput & { openingStock: number; imageUrl: string | null };
   errors: string[];
   warnings: string[];
 }
@@ -65,8 +68,11 @@ function num(v: unknown): number | null {
 }
 
 /** Reads the sheet and validates every row. Nothing is written yet. */
-export function parseProductWorkbook(fileBytes: ArrayBuffer): ParsedRow[] {
-  const wb = XLSX.read(fileBytes, { type: "array" });
+export function parseProductWorkbook(file: ArrayBuffer | string): ParsedRow[] {
+  const wb =
+    typeof file === "string"
+      ? XLSX.read(file, { type: "string" })
+      : XLSX.read(file, { type: "array" });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) throw new Error("That file has no sheets in it.");
   const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName]!, {
@@ -99,6 +105,7 @@ export function parseProductWorkbook(fileBytes: ArrayBuffer): ParsedRow[] {
     const minStock = num(r["Minimum Stock"]) ?? 0;
     const barcode = String(r["Barcode"] ?? "").trim();
     const hsn = String(r["HSN"] ?? "").trim();
+    const imageUrl = String(r["Image URL"] ?? "").trim();
 
     if (!productNumber) errors.push("Product Number is missing.");
     else if (!/^[A-Za-z0-9\-]+$/.test(productNumber))
@@ -127,6 +134,8 @@ export function parseProductWorkbook(fileBytes: ArrayBuffer): ParsedRow[] {
       warnings.push("Retail Price is below Purchase Price.");
     if (!String(r["Category"] ?? "").trim()) warnings.push("Category is blank.");
     if (!String(r["Brand"] ?? "").trim()) warnings.push("Brand is blank.");
+    if (imageUrl && !/^https?:\/\//i.test(imageUrl))
+      warnings.push("Image URL doesn't look like a web address (http/https) - it will be skipped.");
 
     return {
       row: rowNo,
@@ -148,16 +157,43 @@ export function parseProductWorkbook(fileBytes: ArrayBuffer): ParsedRow[] {
         contractor_price: toPaise(num(r["Contractor Price"]) ?? 0),
         min_stock: toQty(minStock),
         openingStock: toQty(opening),
+        imageUrl: /^https?:\/\//i.test(imageUrl) ? imageUrl : null,
       },
     };
   });
 }
 
-/** All-or-nothing import: one SQLite transaction for the whole file. */
-export function importParsedProducts(rows: ParsedRow[], actor: string): number {
+export interface ImportResult {
+  created: number;
+  imagesFetched: number;
+  imagesFailed: { row: number; url: string }[];
+}
+
+/**
+ * Downloads each row's optional Image URL first (best-effort, network I/O
+ * can't happen inside the SQLite transaction below), then creates every
+ * valid row in one all-or-nothing transaction.
+ */
+export async function importParsedProducts(
+  rows: ParsedRow[],
+  actor: string,
+): Promise<ImportResult> {
   const good = rows.filter((r) => r.errors.length === 0);
   if (!good.length) throw new Error("There are no valid rows to import.");
-  return transaction(() => {
+
+  let imagesFetched = 0;
+  const imagesFailed: { row: number; url: string }[] = [];
+  for (const r of good) {
+    if (!r.data.imageUrl) continue;
+    try {
+      r.data.image = await fetchImageAsDataUrl(r.data.imageUrl);
+      imagesFetched++;
+    } catch {
+      imagesFailed.push({ row: r.row, url: r.data.imageUrl });
+    }
+  }
+
+  const created = transaction(() => {
     let count = 0;
     for (const r of good) {
       ensureLookup("categories", r.data.category);
@@ -167,6 +203,7 @@ export function importParsedProducts(rows: ParsedRow[], actor: string): number {
     }
     return count;
   });
+  return { created, imagesFetched, imagesFailed };
 }
 
 // ------------------------------------------------------------------ export

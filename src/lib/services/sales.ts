@@ -30,6 +30,8 @@ export interface SaveBillInput {
   creditApprovedBy?: string;
   /** When no explicit payment split is given, settle the whole bill this way. */
   payFull?: PaymentMethod;
+  /** false for a no-GST cash sale - every line is taxed at 0% and stored that way. */
+  gstApplied?: boolean;
 }
 
 export interface Sale {
@@ -51,6 +53,7 @@ export interface Sale {
   total: number;
   paid: number;
   credit_amount: number;
+  gst_applied: number;
   status: "ACTIVE" | "CANCELLED";
   cancel_reason: string | null;
   notes: string | null;
@@ -143,12 +146,13 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
     return p;
   });
 
+  const gstApplied = input.gstApplied !== false;
   const { totals, lines } = computeBill(
     input.lines.map((l, i) => ({
       qty: l.qty,
       price: l.price,
       discount: l.discount,
-      gstRate: products[i]!.gst_rate,
+      gstRate: gstApplied ? products[i]!.gst_rate : 0,
     })),
     { interstate, billDiscount: input.billDiscount, roundOff: settings.roundOff },
   );
@@ -175,8 +179,8 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
     const saleId = insert(
       `INSERT INTO sales(invoice_number, sale_date, customer_id, customer_name, customer_gstin,
         customer_type, interstate, subtotal, discount, taxable, cgst, sgst, igst, round_off,
-        total, paid, credit_amount, status, notes, created_by, created_at)
-       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'ACTIVE', ?,?,?)`,
+        total, paid, credit_amount, gst_applied, status, notes, created_by, created_at)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'ACTIVE', ?,?,?)`,
       [
         invoiceNumber,
         ts.slice(0, 10),
@@ -195,6 +199,7 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
         totals.total,
         paid,
         credit,
+        gstApplied ? 1 : 0,
         input.notes ?? null,
         input.user,
         ts,
@@ -220,7 +225,7 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
           l.qty,
           l.price,
           t.discount,
-          p.gst_rate,
+          gstApplied ? p.gst_rate : 0,
           t.taxable,
           t.cgst,
           t.sgst,
