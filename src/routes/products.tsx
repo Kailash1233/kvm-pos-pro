@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
-import { Search, Plus, ImagePlus, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, Plus, ImagePlus, X, ChevronDown, ChevronUp, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/kvm/PageHeader";
 import { ProductImage } from "@/components/kvm/ProductImage";
+import { ImportProductsDialog } from "@/components/kvm/ImportProductsDialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ function Products() {
   const { version, refresh, allowed } = useApp();
   const [term, setTerm] = useState("");
   const [editing, setEditing] = useState<ProductWithStock | "new" | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const rows = useMemo(() => {
     try {
       return searchProducts(term, { limit: 200, includeInactive: true });
@@ -78,9 +80,14 @@ function Products() {
         subtitle={`${rows.length} items shown`}
         actions={
           allowed("product.create") ? (
-            <Button onClick={() => setEditing("new")}>
-              <Plus className="mr-1.5 h-4 w-4" /> Add Product
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload className="mr-1.5 h-4 w-4" /> Import
+              </Button>
+              <Button onClick={() => setEditing("new")}>
+                <Plus className="mr-1.5 h-4 w-4" /> Add Product
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -166,6 +173,11 @@ function Products() {
           refresh();
           setEditing(null);
         }}
+      />
+      <ImportProductsDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={refresh}
       />
     </div>
   );

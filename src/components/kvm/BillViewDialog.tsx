@@ -63,6 +63,11 @@ export function BillViewDialog({
               <div>
                 <span className="text-muted-foreground">Status: </span>
                 {viewing.sale.status}
+                {viewing.sale.gst_applied === 0 ? (
+                  <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                    No GST
+                  </span>
+                ) : null}
               </div>
             </div>
             <div className="panel max-h-64 overflow-auto">

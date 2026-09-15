@@ -23,6 +23,7 @@ import { ProductImage } from "@/components/kvm/ProductImage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useApp } from "@/lib/app-context";
 import { formatQty, fromQty, rupees, toPaise, toQty, toRupees } from "@/lib/money";
 import {
@@ -101,6 +102,7 @@ function Billing() {
     OTHER: "",
   });
   const [notes, setNotes] = useState("");
+  const [gstApplied, setGstApplied] = useState(true);
   const [busy, setBusy] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const customerRef = useRef<HTMLInputElement>(null);
@@ -153,7 +155,7 @@ function Billing() {
           qty: l.qty,
           price: l.price,
           discount: l.discount,
-          gstRate: l.product.gst_rate,
+          gstRate: gstApplied ? l.product.gst_rate : 0,
         })),
         {
           interstate,
@@ -161,7 +163,7 @@ function Billing() {
           roundOff: settings.roundOff,
         },
       ),
-    [cart, interstate, billDiscount, settings.roundOff],
+    [cart, interstate, billDiscount, settings.roundOff, gstApplied],
   );
 
   const total = calc.totals.total;
@@ -206,6 +208,24 @@ function Billing() {
     searchRef.current?.focus();
   }, []);
 
+  /**
+   * Cash/UPI/Card are what the customer actually handed over; Credit is
+   * whatever's left. Typing into any of the first three auto-fills Credit
+   * with the remainder, since most bills here are part-payment + credit.
+   * Credit itself stays freely editable - the auto-fill is just a default.
+   */
+  function setPaymentAmount(method: PaymentMethod, raw: string) {
+    setPayments((prev) => {
+      const next = { ...prev, [method]: raw };
+      if (method !== "CREDIT") {
+        const others = toPaise(next.CASH || 0) + toPaise(next.UPI || 0) + toPaise(next.CARD || 0);
+        const remainder = Math.max(0, total - others);
+        next.CREDIT = remainder > 0 ? String(toRupees(remainder)) : "";
+      }
+      return next;
+    });
+  }
+
   function updateLine(i: number, patch: Partial<CartLine>) {
     setCart((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }
@@ -247,6 +267,7 @@ function Billing() {
     setPayments({ CASH: "", UPI: "", CARD: "", CREDIT: "", OTHER: "" });
     setNotes("");
     setTerm("");
+    setGstApplied(true);
     searchRef.current?.focus();
   }
 
@@ -296,6 +317,7 @@ function Billing() {
           payments: list,
           notes,
           user: user.full_name,
+          gstApplied,
         });
         toast.success(`Bill ${invoiceNumber} saved`);
         if (print) {
@@ -327,7 +349,19 @@ function Billing() {
         setBusy(false);
       }
     },
-    [cart, customer, payments, total, billDiscount, notes, user, settings, calc, refresh],
+    [
+      cart,
+      customer,
+      payments,
+      total,
+      billDiscount,
+      notes,
+      user,
+      settings,
+      calc,
+      refresh,
+      gstApplied,
+    ],
   );
 
   useEffect(() => {
@@ -705,7 +739,20 @@ function Billing() {
 
         <aside className="space-y-4">
           <div className="panel p-4">
-            <h2 className="font-medium">Bill summary</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-medium">Bill summary</h2>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="gst-toggle" className="text-xs text-muted-foreground">
+                  Charge GST
+                </Label>
+                <Switch id="gst-toggle" checked={gstApplied} onCheckedChange={setGstApplied} />
+              </div>
+            </div>
+            {!gstApplied ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                No GST on this bill — the customer pays the price without tax added.
+              </p>
+            ) : null}
             <dl className="mt-3 space-y-1.5 text-sm">
               <Row label="Items" value={String(cart.length)} />
               <Row label="Subtotal" value={rupees(calc.totals.subtotal)} />
@@ -720,14 +767,16 @@ function Billing() {
                 />
               </div>
               <Row label="Taxable value" value={rupees(calc.totals.taxable)} />
-              {interstate ? (
-                <Row label="IGST" value={rupees(calc.totals.igst)} />
-              ) : (
-                <>
-                  <Row label="CGST" value={rupees(calc.totals.cgst)} />
-                  <Row label="SGST" value={rupees(calc.totals.sgst)} />
-                </>
-              )}
+              {gstApplied ? (
+                interstate ? (
+                  <Row label="IGST" value={rupees(calc.totals.igst)} />
+                ) : (
+                  <>
+                    <Row label="CGST" value={rupees(calc.totals.cgst)} />
+                    <Row label="SGST" value={rupees(calc.totals.sgst)} />
+                  </>
+                )
+              ) : null}
               {calc.totals.roundOff ? (
                 <Row label="Round off" value={rupees(calc.totals.roundOff)} />
               ) : null}
@@ -750,7 +799,7 @@ function Billing() {
                     className="num mt-1 h-9"
                     placeholder="0"
                     value={payments[m]}
-                    onChange={(e) => setPayments({ ...payments, [m]: e.target.value })}
+                    onChange={(e) => setPaymentAmount(m, e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && remaining === 0 && cart.length) {
                         e.preventDefault();
@@ -813,9 +862,15 @@ function Billing() {
               </Button>
             </div>
             <p
-              className={`mt-3 text-sm ${
-                remaining === 0 ? "text-muted-foreground" : "text-warning"
-              }`}
+              className={
+                remaining === 0
+                  ? "mt-3 text-sm text-muted-foreground"
+                  : `mt-3 rounded-md px-3 py-2 text-sm font-medium ${
+                      remaining > 0
+                        ? "bg-warning/15 text-warning"
+                        : "bg-destructive/10 text-destructive"
+                    }`
+              }
             >
               {remaining === 0
                 ? "Payments match the bill total."
