@@ -3,8 +3,9 @@ import { Lock, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login } from "@/lib/services/auth";
+import { login, listActiveUsernames } from "@/lib/services/auth";
 import { useApp } from "@/lib/app-context";
+import { RecoverPasswordPanel } from "./RecoverPasswordPanel";
 
 export function LoginScreen() {
   const { signIn, settings } = useApp();
@@ -12,6 +13,7 @@ export function LoginScreen() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [recovering, setRecovering] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,6 +26,20 @@ export function LoginScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (recovering) {
+    return (
+      <RecoverPasswordPanel
+        usernames={listActiveUsernames()}
+        onDone={(recoveredUsername) => {
+          setUsername(recoveredUsername);
+          setPassword("");
+          setRecovering(false);
+        }}
+        onCancel={() => setRecovering(false)}
+      />
+    );
   }
 
   return (
@@ -88,6 +104,13 @@ export function LoginScreen() {
           <Button type="submit" className="mt-6 w-full" size="lg" disabled={busy}>
             {busy ? "Checking…" : "Sign in"}
           </Button>
+          <button
+            type="button"
+            className="mt-3 w-full text-center text-sm text-muted-foreground hover:text-foreground hover:underline"
+            onClick={() => setRecovering(true)}
+          >
+            Forgot your password?
+          </button>
         </form>
       </div>
     </div>

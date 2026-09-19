@@ -1,5 +1,6 @@
 import { all, insert, nowIso, one, run, schedulePersist } from "../db/database";
 import { logAudit } from "./audit";
+import { getSettings } from "./settings";
 
 export type Role = "OWNER" | "MANAGER" | "CASHIER";
 
@@ -83,6 +84,52 @@ export async function login(username: string, password: string): Promise<AppUser
 
 export function listUsers(): AppUser[] {
   return all<AppUser>("SELECT id, username, full_name, role, active FROM users ORDER BY id");
+}
+
+/** Usernames only, for the "forgot password" picker on the sign-in screen. */
+export function listActiveUsernames(): string[] {
+  return all<{ username: string }>("SELECT username FROM users WHERE active = 1 ORDER BY id").map(
+    (r) => r.username,
+  );
+}
+
+/**
+ * Self-service recovery when nobody can sign in. There is no email/SMS on
+ * an offline app, so identity is proven with the shop's own GSTIN instead -
+ * not a secret, but not something a stranger picking up the PC would know
+ * either, and this app's real security boundary is physical access to the
+ * computer, which recovery can't weaken any further than it already is.
+ */
+export async function recoverPassword(params: {
+  username: string;
+  gstinConfirm: string;
+  newPassword: string;
+}): Promise<void> {
+  const settings = getSettings();
+  if (params.gstinConfirm.trim().toUpperCase() !== settings.gstin.trim().toUpperCase()) {
+    throw new Error("That GSTIN does not match this shop's records.");
+  }
+  const row = one<{ id: number }>(
+    "SELECT id FROM users WHERE lower(username) = lower(?) AND active = 1",
+    [params.username.trim()],
+  );
+  if (!row) throw new Error("No active user with that username.");
+  if (params.newPassword.length < 6) throw new Error("Password must be at least 6 characters.");
+  const salt = randomSalt();
+  const hash = await hashPassword(params.newPassword, salt);
+  run("UPDATE users SET password_hash = ?, password_salt = ?, updated_at = ? WHERE id = ?", [
+    hash,
+    salt,
+    nowIso(),
+    row.id,
+  ]);
+  logAudit({
+    user: params.username,
+    action: "PASSWORD_RECOVERED",
+    entity: "users",
+    entityId: row.id,
+  });
+  schedulePersist();
 }
 
 export function userCount(): number {
