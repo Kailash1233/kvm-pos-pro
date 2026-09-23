@@ -32,7 +32,7 @@ import { printInvoice } from "@/lib/services/print";
 export const Route = createFileRoute("/sales")({
   head: () => ({
     meta: [
-      { title: "Sales — KVM Agencies Bill History & Returns" },
+      { title: "Sales — Unizo Bill History & Returns" },
       {
         name: "description",
         content:

@@ -14,26 +14,27 @@ export interface BusinessSettings {
   printFormat: "A4" | "THERMAL";
   lowStockAlerts: boolean;
   setupComplete: boolean;
-  demoDataLoaded: boolean;
+  /** Data: URL (JPEG, resized client-side), shown in the sidebar and on invoices in place of the default mark. */
+  logo: string | null;
   lastBackup: string;
   roundOff: boolean;
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
-  businessName: "KVM Agencies",
-  address: "52, Kanchipuram High Rd, Natham, Chengalpattu, Tamil Nadu 603002",
+  businessName: "",
+  address: "",
   phone: "",
   email: "",
-  gstin: "33BAZPM1036Q1Z1",
-  state: "Tamil Nadu",
-  stateCode: "33",
-  invoicePrefix: "KVM",
+  gstin: "",
+  state: "",
+  stateCode: "",
+  invoicePrefix: "INV",
   invoiceFooter: "Goods once sold will not be taken back without prior approval.",
   currency: "INR",
   printFormat: "A4",
   lowStockAlerts: true,
   setupComplete: false,
-  demoDataLoaded: false,
+  logo: null,
   lastBackup: "",
   roundOff: true,
 };

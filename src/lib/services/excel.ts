@@ -51,7 +51,7 @@ export async function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Products");
   const bytes = new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer);
-  return saveExportFile("KVM_Product_Import_Template.xlsx", bytes);
+  return saveExportFile("Unizo_Product_Import_Template.xlsx", bytes);
 }
 
 export interface ParsedRow {

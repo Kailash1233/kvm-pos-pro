@@ -3,11 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { useApp } from "@/lib/app-context";
 import { saveSettings } from "@/lib/services/settings";
 import { createUser, login } from "@/lib/services/auth";
-import { loadDemoData } from "@/lib/services/demo";
 import { persist } from "@/lib/db/database";
 
 const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -19,15 +17,15 @@ export function SetupWizard() {
   const [error, setError] = useState<string | null>(null);
 
   const [biz, setBiz] = useState({
-    businessName: "KVM Agencies",
-    address: "52, Kanchipuram High Road, Natham, Chengalpattu, Tamil Nadu 603002",
+    businessName: "",
+    address: "",
     phone: "",
     email: "",
-    gstin: "33BAZPM1036Q1Z1",
-    state: "Tamil Nadu",
-    stateCode: "33",
-    invoicePrefix: "KVM",
-    invoiceFooter: "Goods once sold will not be taken back. Subject to Chengalpattu jurisdiction.",
+    gstin: "",
+    state: "",
+    stateCode: "",
+    invoicePrefix: "INV",
+    invoiceFooter: "Goods once sold will not be taken back.",
   });
   const [owner, setOwner] = useState({
     fullName: "",
@@ -35,7 +33,6 @@ export function SetupWizard() {
     password: "",
     confirm: "",
   });
-  const [withDemo, setWithDemo] = useState(false);
 
   function next() {
     setError(null);
@@ -66,7 +63,6 @@ export function SetupWizard() {
         password: owner.password,
         actor: owner.fullName.trim(),
       });
-      if (withDemo) loadDemoData(owner.fullName.trim());
       await persist();
       const user = await login(owner.username.trim(), owner.password);
       completeSetup();
@@ -200,20 +196,10 @@ export function SetupWizard() {
                 {new Date().getFullYear()}-000001
               </p>
               <p className="mt-1 text-muted-foreground">
-                Your product list, customers and bills all start empty and ready for KVM's real data
-                — this setup screen only appears once, right now.
+                Your product list, customers and bills all start completely empty, ready for your
+                own data — this setup screen only appears once, right now. You can import your
+                product list from a spreadsheet once you're signed in, from Products &gt; Import.
               </p>
-            </div>
-            <div className="flex items-start justify-between gap-6 rounded-md border border-border p-4">
-              <div>
-                <div className="font-medium">Add practice data (optional)</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Off by default. Turning this on adds 30 sample building-material items, 10
-                  customers, 5 suppliers and a few example bills, useful only for trying the app out
-                  before you start entering KVM's own products.
-                </p>
-              </div>
-              <Switch checked={withDemo} onCheckedChange={setWithDemo} />
             </div>
           </div>
         ) : null}

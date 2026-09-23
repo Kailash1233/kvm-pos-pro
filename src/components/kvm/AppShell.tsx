@@ -21,6 +21,7 @@ import type { Permission } from "@/lib/services/auth";
 import { LoginScreen } from "./LoginScreen";
 import { SetupWizard } from "./SetupWizard";
 import { KeyboardShortcutsProvider, useOpenShortcuts } from "./KeyboardShortcuts";
+import { UnizoMark } from "./UnizoMark";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -92,10 +93,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     <KeyboardShortcutsProvider>
       <div className="flex min-h-screen bg-background">
         <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
-          <div className="border-b border-sidebar-border px-5 py-4">
-            <div className="text-base font-semibold tracking-tight">{settings.businessName}</div>
-            <div className="mt-0.5 text-xs text-sidebar-foreground/60">
-              Offline retail &amp; materials
+          <div className="flex items-center gap-2.5 border-b border-sidebar-border px-5 py-4">
+            {settings.logo ? (
+              <img
+                src={settings.logo}
+                alt=""
+                className="h-8 w-8 shrink-0 rounded-md object-cover"
+              />
+            ) : (
+              <UnizoMark className="h-8 w-8 shrink-0" />
+            )}
+            <div className="min-w-0">
+              <div className="truncate text-base font-semibold tracking-tight">
+                {settings.businessName || "Your business"}
+              </div>
+              <div className="mt-0.5 text-xs text-sidebar-foreground/60">
+                Offline billing &amp; accounts
+              </div>
             </div>
           </div>
           <nav className="flex-1 space-y-1 overflow-y-auto p-3">
@@ -131,6 +145,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <LogOut className="h-4 w-4" /> Sign out
             </button>
+            <div className="mt-3 px-2 text-center text-[11px] text-sidebar-foreground/40">
+              Unizo by Adszoo
+            </div>
           </div>
         </aside>
         <main className="min-w-0 flex-1">{children}</main>

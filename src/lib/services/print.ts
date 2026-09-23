@@ -114,11 +114,14 @@ export function invoiceHtmlA4(d: InvoiceData, s: BusinessSettings, title = "TAX 
 </style></head><body>
 ${sale.status === "CANCELLED" ? '<div class="cancelled">CANCELLED</div>' : ""}
 <div class="head">
-  <div>
-    <div class="biz">${esc(s.businessName)}</div>
-    <div class="muted">${esc(s.address)}</div>
-    <div class="muted">Phone: ${esc(s.phone)}${s.email ? " &nbsp; " + esc(s.email) : ""}</div>
-    <div><b>GSTIN:</b> ${esc(s.gstin)} &nbsp; <b>State:</b> ${esc(s.state)} (${esc(s.stateCode)})</div>
+  <div style="display:flex; gap:10px; align-items:flex-start;">
+    ${s.logo ? `<img src="${esc(s.logo)}" alt="" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : ""}
+    <div>
+      <div class="biz">${esc(s.businessName)}</div>
+      <div class="muted">${esc(s.address)}</div>
+      <div class="muted">Phone: ${esc(s.phone)}${s.email ? " &nbsp; " + esc(s.email) : ""}</div>
+      <div><b>GSTIN:</b> ${esc(s.gstin)} &nbsp; <b>State:</b> ${esc(s.state)} (${esc(s.stateCode)})</div>
+    </div>
   </div>
   <div class="n">
     <div><b>Invoice No:</b> ${esc(sale.invoice_number)}</div>

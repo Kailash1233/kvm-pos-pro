@@ -16,7 +16,7 @@ function stamp(d = new Date()): string {
   )}${p(d.getSeconds())}`;
 }
 
-export async function backupNow(actor: string, prefix = "KVM"): Promise<string> {
+export async function backupNow(actor: string, prefix = "Unizo"): Promise<string> {
   await persist();
   const name = `${prefix}_${stamp()}.db`;
   const path = await writeBackup(exportBytes(), name);
@@ -35,7 +35,7 @@ export async function restoreBackup(name: string, actor: string): Promise<void> 
   if (!bytes || bytes.byteLength === 0)
     throw new Error("That backup file could not be read. Please choose another backup.");
   // Safety copy of the live database before anything is replaced.
-  await backupNow(actor, "KVM_SAFETY");
+  await backupNow(actor, "Unizo_SAFETY");
   await replaceDatabase(bytes);
   const ok = scalar<string>("PRAGMA integrity_check");
   if (ok !== "ok") throw new Error("The restored file did not pass the database check.");
@@ -45,7 +45,7 @@ export async function restoreBackup(name: string, actor: string): Promise<void> 
 
 export async function importBackupFile(bytes: Uint8Array, actor: string): Promise<void> {
   if (!bytes || bytes.byteLength === 0) throw new Error("That file is empty.");
-  await backupNow(actor, "KVM_SAFETY");
+  await backupNow(actor, "Unizo_SAFETY");
   await replaceDatabase(bytes);
   logAudit({ user: actor, action: "BACKUP_RESTORED_FILE", entity: "database" });
   await persist();
@@ -70,6 +70,6 @@ export async function autoBackupIfDue(actor: string, lastBackup: string): Promis
   const last = lastBackup ? new Date(lastBackup) : null;
   const now = new Date();
   if (last && now.getTime() - last.getTime() < 12 * 60 * 60 * 1000) return false;
-  await backupNow(actor, "KVM_AUTO");
+  await backupNow(actor, "Unizo_AUTO");
   return true;
 }

@@ -1,20 +1,20 @@
-# KVM Agencies — Standard Operating Procedure
+# Unizo — Standard Operating Procedure
 
-A plain-language guide for using KVM Agencies day to day. No computer
+A plain-language guide for using Unizo day to day. No computer
 knowledge is needed beyond clicking, typing, and reading this page.
 
 ---
 
 ## 1. Installing the app (do this once, on the shop computer)
 
-1. Copy `KVM-Agencies-Setup.exe` (or the portable `KVM-Agencies-Windows.exe`)
+1. Copy `Unizo-Setup.exe` (or the portable `Unizo-Windows.exe`)
    onto the shop computer.
 2. Double-click it.
 3. Windows will show a blue **"Windows protected your PC"** screen. This is
    normal — it appears for any new app that hasn't paid Microsoft for a
    certificate. Click **More info**, then **Run anyway**.
 4. If you used the Setup version: follow the install screen (Next → Next →
-   Install), then open **KVM Agencies** from the Start Menu or the desktop
+   Install), then open **Unizo** from the Start Menu or the desktop
    shortcut it creates. If you used the portable version: it opens
    immediately, no installation step.
 5. The app opens in its own window — not a web browser. You will never see
@@ -31,7 +31,7 @@ computer from Wi-Fi/network entirely and the app works exactly the same.
 
 ## 2. Starting your day
 
-1. Double-click the **KVM Agencies** icon.
+1. Double-click the **Unizo** icon.
 2. Sign in with your username and password.
 3. You'll land on the **Home** screen — today's sales, cash/UPI/card split,
    any items running low, and your 10 most recent bills.

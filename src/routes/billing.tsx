@@ -49,13 +49,13 @@ import { printInvoice } from "@/lib/services/print";
 export const Route = createFileRoute("/billing")({
   head: () => ({
     meta: [
-      { title: "Billing — KVM Agencies GST Invoicing" },
+      { title: "Billing — Unizo GST Invoicing" },
       {
         name: "description",
         content:
           "Create GST bills fast with product search, customer credit, split payments and instant printing.",
       },
-      { property: "og:title", content: "Billing — KVM Agencies GST Invoicing" },
+      { property: "og:title", content: "Billing — Unizo GST Invoicing" },
       {
         property: "og:description",
         content: "Fast counter billing with GST, credit and split payments.",
@@ -654,11 +654,11 @@ function Billing() {
               <thead className="bg-secondary text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="min-w-64 px-4 py-2.5 text-left">Item</th>
-                  <th className="px-2 py-2.5 text-right">Qty</th>
-                  <th className="px-2 py-2.5 text-right">Rate</th>
-                  <th className="px-2 py-2.5 text-right">Discount</th>
-                  <th className="px-2 py-2.5 text-right">GST</th>
-                  <th className="px-2 py-2.5 text-right">Amount</th>
+                  <th className="w-28 px-2 py-2.5 text-right">Qty</th>
+                  <th className="w-28 px-2 py-2.5 text-right">Rate</th>
+                  <th className="w-28 px-2 py-2.5 text-right">Discount</th>
+                  <th className="w-24 px-2 py-2.5 text-right">GST</th>
+                  <th className="w-28 px-2 py-2.5 text-right">Amount</th>
                   <th className="w-10" />
                 </tr>
               </thead>
@@ -685,7 +685,7 @@ function Billing() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 text-right">
                           <Input
                             id={`cart-qty-${i}`}
                             className="num h-9 w-24"
@@ -694,7 +694,7 @@ function Billing() {
                             onKeyDown={(e) => cartCellKeyDown(e, i, "qty")}
                           />
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 text-right">
                           <Input
                             id={`cart-rate-${i}`}
                             className="num h-9 w-24"
@@ -703,7 +703,7 @@ function Billing() {
                             onKeyDown={(e) => cartCellKeyDown(e, i, "rate")}
                           />
                         </td>
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 text-right">
                           <Input
                             id={`cart-discount-${i}`}
                             className="num h-9 w-24"
