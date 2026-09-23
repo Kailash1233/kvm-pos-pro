@@ -43,7 +43,7 @@ import type { PaymentMethod } from "@/lib/services/sales";
 export const Route = createFileRoute("/customers")({
   head: () => ({
     meta: [
-      { title: "Customers — KVM Agencies Ledger & Credit" },
+      { title: "Customers — Unizo Ledger & Credit" },
       {
         name: "description",
         content:

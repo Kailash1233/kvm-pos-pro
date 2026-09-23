@@ -7,13 +7,12 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { AppProvider } from "../lib/app-context";
 import { AppShell } from "../components/kvm/AppShell";
 import { Toaster } from "../components/ui/sonner";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
   return (
@@ -40,9 +39,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -80,21 +76,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "KVM Agencies — Offline Retail & Materials Manager" },
+      { title: "Unizo — Offline Retail Billing & Business Manager" },
       {
         name: "description",
         content:
-          "Offline billing, GST invoicing, stock and accounts for KVM Agencies retail and construction materials.",
+          "Unizo: offline billing, GST invoicing, stock and accounts management for retail businesses.",
       },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "KVM Agencies — Offline Retail & Materials Manager" },
+      { name: "author", content: "Adszoo" },
+      { property: "og:title", content: "Unizo — Offline Retail Billing & Business Manager" },
       {
         property: "og:description",
-        content: "Offline GST billing, stock and ledgers for a building materials shop.",
+        content: "Offline GST billing, stock and ledgers for retail and trading businesses.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {

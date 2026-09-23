@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { FolderOpen, KeyRound, Plus, RotateCcw, Upload } from "lucide-react";
+import { FolderOpen, ImagePlus, KeyRound, Plus, RotateCcw, Upload } from "lucide-react";
 import { PageHeader } from "@/components/kvm/PageHeader";
+import { UnizoMark } from "@/components/kvm/UnizoMark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,17 +40,18 @@ import {
   type AppUser,
   type Role,
 } from "@/lib/services/auth";
+import { readImageAsDataUrl } from "@/lib/image";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — KVM Agencies Shop & Bill Setup" },
+      { title: "Settings — Unizo Shop & Bill Setup" },
       {
         name: "description",
         content:
           "Change shop details, GSTIN, invoice numbering, printing size and take a backup of your data.",
       },
-      { property: "og:title", content: "Settings — KVM Agencies Shop & Bill Setup" },
+      { property: "og:title", content: "Settings — Unizo Shop & Bill Setup" },
       {
         property: "og:description",
         content: "Shop details, GSTIN, invoice numbering, print size and backups.",
@@ -67,9 +69,20 @@ function Settings() {
   const [restoreName, setRestoreName] = useState<string | null>(null);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const logoRef = useRef<HTMLInputElement>(null);
   const [backupList, setBackupList] = useState<{ name: string; size: number; created: string }[]>(
     [],
   );
+
+  async function pickLogo(file: File | undefined) {
+    if (!file) return;
+    try {
+      const dataUrl = await readImageAsDataUrl(file, 256, 0.85);
+      setForm((f) => ({ ...f, logo: dataUrl }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "That image could not be used.");
+    }
+  }
 
   async function refreshBackups() {
     setBackupList(await listBackups());
@@ -189,6 +202,48 @@ function Settings() {
         </p>
       </div>
       <div className="grid max-w-3xl gap-4 p-6 md:grid-cols-2">
+        <Field label="Business logo" className="md:col-span-2">
+          <div className="flex items-center gap-3">
+            {form.logo ? (
+              <img
+                src={form.logo}
+                alt="Business logo"
+                className="h-14 w-14 rounded-md border border-border object-cover"
+              />
+            ) : (
+              <UnizoMark className="h-14 w-14" />
+            )}
+            <input
+              ref={logoRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => void pickLogo(e.target.files?.[0])}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => logoRef.current?.click()}
+            >
+              <ImagePlus className="mr-1.5 h-3.5 w-3.5" /> Upload logo
+            </Button>
+            {form.logo ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setForm({ ...form, logo: null })}
+              >
+                Remove
+              </Button>
+            ) : null}
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Shown in the sidebar, on the sign-in screen and on printed invoices. Leave empty to use
+            the default Unizo mark.
+          </p>
+        </Field>
         <Field label="Shop name" className="md:col-span-2">
           <Input
             value={form.businessName}
@@ -282,6 +337,15 @@ function Settings() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Backup &amp; Data
           </h2>
+          <p className="text-sm text-muted-foreground">
+            Everything — products, bills, customers, stock — lives in one file on this computer.
+            Backups are automatic in the background, and you can also take one anytime with{" "}
+            <b>Backup now</b> above. <b>Updating Unizo to a new version on this same computer</b>{" "}
+            never touches this data — installing over the top is always safe.{" "}
+            <b>Moving to a different computer?</b> Copy the database file (path below) or a backup
+            file from the Backups folder onto the new machine, then use <b>Restore from file</b>{" "}
+            here to load it in.
+          </p>
           <div className="panel grid gap-3 p-4 text-sm md:grid-cols-2">
             <div>
               <div className="text-xs text-muted-foreground">Database location</div>

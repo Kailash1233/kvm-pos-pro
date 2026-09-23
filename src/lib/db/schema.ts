@@ -1,5 +1,5 @@
 /**
- * SQLite schema for KVM Agencies.
+ * SQLite schema for Unizo.
  *
  * Money columns are INTEGER paise. Quantity columns are INTEGER milli-units.
  * Financial records are never physically deleted - they are cancelled/voided.

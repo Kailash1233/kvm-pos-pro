@@ -136,20 +136,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 function getDefault(): BusinessSettings {
   return {
-    businessName: "KVM Agencies",
+    businessName: "",
     address: "",
     phone: "",
     email: "",
     gstin: "",
-    state: "Tamil Nadu",
-    stateCode: "33",
-    invoicePrefix: "KVM",
+    state: "",
+    stateCode: "",
+    invoicePrefix: "INV",
     invoiceFooter: "",
     currency: "INR",
     printFormat: "A4",
     lowStockAlerts: true,
     setupComplete: false,
-    demoDataLoaded: false,
+    logo: null,
     lastBackup: "",
     roundOff: true,
   };

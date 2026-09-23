@@ -1,4 +1,4 @@
-# KVM Agencies — Feature List
+# Unizo — Feature List
 
 What the application actually does today, organized by module. Anything not
 listed here as done is called out explicitly at the bottom under
@@ -180,11 +180,11 @@ without the `profit.view` permission (i.e., Cashiers never see margins).
 
 ## Windows desktop packaging
 
-- A real Electron desktop app: double-click `KVM Agencies.exe`, a normal
+- A real Electron desktop app: double-click `Unizo.exe`, a normal
   window opens (no browser, no address bar, no visible terminal, no
   "localhost" for the user to think about).
 - The database and all backups live under
-  `%APPDATA%\KVM Agencies\` — deliberately *not* the Documents folder,
+  `%APPDATA%\Unizo\` — deliberately *not* the Documents folder,
   because Documents is commonly OneDrive-synced on Windows and that would
   risk silently uploading the "offline" database to the cloud or locking
   the file mid-write.

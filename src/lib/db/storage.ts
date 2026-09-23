@@ -3,7 +3,7 @@
  *
  * In the packaged Windows desktop app the Electron preload exposes
  * window.kvmDesktop, and the database is a real .db file in the
- * user's application data folder (KVM Agencies/Database).
+ * user's application data folder (Unizo/Database).
  *
  * Without that bridge (development preview) the same bytes are kept in
  * the local browser IndexedDB store. Nothing ever leaves the machine.
@@ -110,7 +110,7 @@ export async function listBackupFiles(): Promise<
     out.push({
       name: k.slice(BACKUP_PREFIX.length),
       size: data?.byteLength ?? 0,
-      created: k.slice(BACKUP_PREFIX.length).replace(/KVM_|\.db/g, ""),
+      created: k.slice(BACKUP_PREFIX.length).replace(/Unizo_|KVM_|\.db/g, ""),
     });
   }
   return out.sort((a, b2) => (a.name < b2.name ? 1 : -1));

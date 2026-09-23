@@ -40,13 +40,13 @@ import { readImageAsDataUrl } from "@/lib/image";
 export const Route = createFileRoute("/products")({
   head: () => ({
     meta: [
-      { title: "Products — KVM Agencies Item Master" },
+      { title: "Products — Unizo Item Master" },
       {
         name: "description",
         content:
-          "Search cement, steel, plumbing, paint and electrical items with prices, GST rates and live stock.",
+          "Search products by number, name, brand or HSN, with prices, GST rates and live stock.",
       },
-      { property: "og:title", content: "Products — KVM Agencies Item Master" },
+      { property: "og:title", content: "Products — Unizo Item Master" },
       {
         property: "og:description",
         content: "Item master with prices, GST rates and live stock levels.",

@@ -48,7 +48,7 @@ import { exportCsv } from "@/lib/services/excel";
 export const Route = createFileRoute("/reports")({
   head: () => ({
     meta: [
-      { title: "Reports — KVM Agencies Sales, Stock & Profit" },
+      { title: "Reports — Unizo Sales, Stock & Profit" },
       {
         name: "description",
         content:

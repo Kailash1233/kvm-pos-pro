@@ -1,4 +1,4 @@
-// Electron main process for the KVM Agencies desktop app.
+// Electron main process for the Unizo desktop app.
 //
 // Architecture:
 //  1. Owns the local data folder (Database / Backups / Exports / Config /
@@ -27,10 +27,10 @@ const http = require("node:http");
 const net = require("node:net");
 const { fork } = require("node:child_process");
 
-app.setName("KVM Agencies");
-if (app.setAppUserModelId) app.setAppUserModelId("com.kvmagencies.pos");
+app.setName("Unizo");
+if (app.setAppUserModelId) app.setAppUserModelId("com.adszoo.unizo");
 
-const ROOT_DIR = path.join(app.getPath("appData"), "KVM Agencies");
+const ROOT_DIR = path.join(app.getPath("appData"), "Unizo");
 const DIRS = {
   root: ROOT_DIR,
   database: path.join(ROOT_DIR, "Database"),
@@ -42,7 +42,27 @@ const DIRS = {
 };
 const DB_FILE = path.join(DIRS.database, "kvm.db");
 
+/**
+ * Older builds shipped as "KVM Agencies" and stored data under that name.
+ * If this is the first launch after upgrading from one of those builds -
+ * the new data folder is empty but the old one has a database - copy it
+ * over once so nobody loses their bills/products just from updating the
+ * app. Never deletes the old folder, so this is always safe to re-run.
+ */
+function migrateFromPreviousBrand() {
+  const oldRoot = path.join(app.getPath("appData"), "KVM Agencies");
+  const oldDb = path.join(oldRoot, "Database", "kvm.db");
+  if (fs.existsSync(DB_FILE) || !fs.existsSync(oldDb)) return;
+  try {
+    fs.cpSync(oldRoot, ROOT_DIR, { recursive: true });
+    logLine(`Migrated data from previous "KVM Agencies" install at ${oldRoot}`);
+  } catch (e) {
+    logLine(`migrateFromPreviousBrand failed: ${e?.stack || e}`);
+  }
+}
+
 for (const dir of Object.values(DIRS)) fs.mkdirSync(dir, { recursive: true });
+migrateFromPreviousBrand();
 
 const LOG_FILE = path.join(DIRS.logs, "main.log");
 function logLine(line) {
@@ -112,7 +132,10 @@ ipcMain.handle("kvm:saveFile", async (_evt, name, bytes) => {
 /** Keeps a generous cap of local backups on disk; the app also schedules its own 7-daily/4-weekly cadence. */
 async function pruneOldBackups() {
   const names = await fsp.readdir(DIRS.backups).catch(() => []);
-  const daily = names.filter((n) => n.startsWith("KVM_") && !n.startsWith("KVM_SAFETY")).sort();
+  const isSafety = (n) => n.startsWith("Unizo_SAFETY") || n.startsWith("KVM_SAFETY");
+  const daily = names
+    .filter((n) => (n.startsWith("Unizo_") || n.startsWith("KVM_")) && !isSafety(n))
+    .sort();
   const excess = daily.length - 30;
   if (excess > 0) {
     for (const name of daily.slice(0, excess)) {
@@ -207,7 +230,7 @@ async function createWindow() {
     port = await startAppServer();
   } catch (e) {
     dialog.showErrorBox(
-      "KVM Agencies could not start",
+      "Unizo could not start",
       "The application could not start its local data service. Please reinstall the application, or contact the administrator.",
     );
     logLine(`startAppServer failed: ${e?.stack || e}`);
@@ -225,7 +248,7 @@ async function createWindow() {
     show: false,
     autoHideMenuBar: true,
     icon: path.join(__dirname, "icon.png"),
-    title: "KVM Agencies",
+    title: "Unizo",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

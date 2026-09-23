@@ -10,13 +10,12 @@ import { formatQty, rupees } from "@/lib/money";
 export const Route = createFileRoute("/stock")({
   head: () => ({
     meta: [
-      { title: "Stock — KVM Agencies Inventory Levels" },
+      { title: "Stock — Unizo Inventory Levels" },
       {
         name: "description",
-        content:
-          "Live stock quantities, low stock warnings and total inventory value for the building materials shop.",
+        content: "Live stock quantities, low stock warnings and total inventory value.",
       },
-      { property: "og:title", content: "Stock — KVM Agencies Inventory Levels" },
+      { property: "og:title", content: "Stock — Unizo Inventory Levels" },
       {
         property: "og:description",
         content: "Live stock levels, low stock warnings and inventory value.",

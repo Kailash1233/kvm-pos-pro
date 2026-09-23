@@ -37,7 +37,7 @@ import type { PaymentMethod } from "@/lib/services/sales";
 export const Route = createFileRoute("/purchases")({
   head: () => ({
     meta: [
-      { title: "Purchases — KVM Agencies Stock-in & Supplier Bills" },
+      { title: "Purchases — Unizo Stock-in & Supplier Bills" },
       {
         name: "description",
         content:

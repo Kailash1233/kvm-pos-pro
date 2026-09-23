@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { login, listActiveUsernames } from "@/lib/services/auth";
 import { useApp } from "@/lib/app-context";
 import { RecoverPasswordPanel } from "./RecoverPasswordPanel";
+import { UnizoMark } from "./UnizoMark";
 
 export function LoginScreen() {
   const { signIn, settings } = useApp();
@@ -46,8 +47,17 @@ export function LoginScreen() {
     <div className="flex min-h-screen">
       <div className="hidden flex-1 flex-col justify-between bg-sidebar p-12 text-sidebar-foreground lg:flex">
         <div>
-          <div className="text-2xl font-semibold tracking-tight">{settings.businessName}</div>
-          <p className="mt-2 max-w-sm text-sm text-sidebar-foreground/70">
+          <div className="flex items-center gap-3">
+            {settings.logo ? (
+              <img src={settings.logo} alt="" className="h-10 w-10 rounded-md object-cover" />
+            ) : (
+              <UnizoMark className="h-10 w-10" />
+            )}
+            <div className="text-2xl font-semibold tracking-tight">
+              {settings.businessName || "Your business"}
+            </div>
+          </div>
+          <p className="mt-4 max-w-sm text-sm text-sidebar-foreground/70">
             Billing, stock, purchases and accounts — all stored on this computer, with no internet
             needed.
           </p>
@@ -58,6 +68,7 @@ export function LoginScreen() {
           <li>Customer and supplier balances</li>
           <li>Daily backups you keep yourself</li>
         </ul>
+        <div className="text-xs text-sidebar-foreground/40">Unizo by Adszoo</div>
       </div>
       <div className="flex flex-1 items-center justify-center px-6 py-12">
         <form onSubmit={submit} className="w-full max-w-sm">

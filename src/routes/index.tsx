@@ -13,13 +13,13 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Today at KVM Agencies — Sales, Stock & Dues" },
+      { title: "Today at Unizo — Sales, Stock & Dues" },
       {
         name: "description",
         content:
-          "Daily sales total, payment split, low stock warnings and pending customer dues for KVM Agencies.",
+          "Daily sales total, payment split, low stock warnings and pending customer dues for Unizo.",
       },
-      { property: "og:title", content: "Today at KVM Agencies — Sales, Stock & Dues" },
+      { property: "og:title", content: "Today at Unizo — Sales, Stock & Dues" },
       {
         property: "og:description",
         content: "Daily sales, payment split, low stock warnings and pending dues.",

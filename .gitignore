@@ -22,6 +22,11 @@ release
 .wrangler/
 .dev.vars
 
+# Test output
+test-results/
+playwright-report/
+coverage/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

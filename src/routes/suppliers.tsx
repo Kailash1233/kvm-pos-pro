@@ -39,7 +39,7 @@ import type { PaymentMethod } from "@/lib/services/sales";
 export const Route = createFileRoute("/suppliers")({
   head: () => ({
     meta: [
-      { title: "Suppliers — KVM Agencies Purchase Ledger" },
+      { title: "Suppliers — Unizo Purchase Ledger" },
       {
         name: "description",
         content: "Manage supplier accounts, outstanding dues, purchase history and payments made.",

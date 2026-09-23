@@ -1,6 +1,6 @@
 name: Build Windows Desktop App
 
-# Builds the real KVM Agencies.exe on an actual Windows runner - no wine,
+# Builds the real Unizo.exe on an actual Windows runner - no wine,
 # no cross-compilation tricks. Produces:
 #   - a portable single-file .exe (double-click, no installation)
 #   - a traditional installer .exe (Start Menu/Desktop shortcuts, uninstaller)
@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Run unit tests (money/GST calculations)
+        run: bun run test
+
       - name: Build the desktop app bundle (Nitro node-server preset)
         run: bun run build:desktop
 
@@ -39,7 +42,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: KVM-Agencies-Windows-${{ github.run_number }}
+          name: Unizo-Windows-${{ github.run_number }}
           path: release/*.exe
           retention-days: 60
 
@@ -47,14 +50,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: windows-build-${{ github.run_number }}
-          name: KVM Agencies (Windows) - build ${{ github.run_number }}
+          name: Unizo (Windows) - build ${{ github.run_number }}
           prerelease: true
           files: release/*.exe
           body: |
             Automated Windows build from commit ${{ github.sha }}.
 
-            - **KVM-Agencies-*-Windows.exe** - portable, no installation. Double-click and it opens.
-            - **KVM-Agencies-*-Setup.exe** - installer with Start Menu/Desktop shortcuts and an uninstaller.
+            - **Unizo-*-Windows.exe** - portable, no installation. Double-click and it opens.
+            - **Unizo-*-Setup.exe** - installer with Start Menu/Desktop shortcuts and an uninstaller.
 
             This build is unsigned (no paid code-signing certificate), so Windows
             SmartScreen will show a "Windows protected your PC" warning the first
