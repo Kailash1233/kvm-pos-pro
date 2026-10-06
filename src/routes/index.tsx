@@ -1,10 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { AlertTriangle, ArrowRight, IndianRupee, Package, ReceiptText, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  IndianRupee,
+  Package,
+  PackageCheck,
+  ReceiptText,
+  Users,
+} from "lucide-react";
 import { useApp, useQueryData } from "@/lib/app-context";
 import { daySummary, stockValue } from "@/lib/services/reports";
 import { lowStockProducts } from "@/lib/services/products";
 import { listSales } from "@/lib/services/sales";
+import { pendingDeliverySummary } from "@/lib/services/creditInvoices";
 import { rupees, formatQty, rupeesShort } from "@/lib/money";
 import { PageHeader } from "@/components/kvm/PageHeader";
 import { BillViewDialog } from "@/components/kvm/BillViewDialog";
@@ -30,11 +39,15 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { user } = useApp();
+  const { user, settings } = useApp();
   const summary = useQueryData(() => daySummary());
   const stock = useQueryData(() => stockValue());
   const low = useQueryData(() => lowStockProducts(8));
   const recent = useQueryData(() => listSales({ limit: 8 }));
+  const pending = useQueryData(
+    () => pendingDeliverySummary(settings.creditInvoicePendingDays || 3),
+    [settings.creditInvoicePendingDays],
+  );
   const [viewId, setViewId] = useState<number | null>(null);
 
   return (
@@ -82,6 +95,20 @@ function Home() {
             value={rupees(stock?.cost ?? 0)}
             hint={`Selling value ${rupeesShort(stock?.retail ?? 0)}`}
           />
+          <Link
+            to="/credit-invoices"
+            className="panel block p-5 transition-colors hover:bg-secondary/40"
+          >
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <PackageCheck className="h-4 w-4" /> Pending deliveries
+            </div>
+            <div className="num mt-2 text-2xl font-semibold tracking-tight">
+              {pending?.total ?? 0}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {pending?.overdue ? `${pending.overdue} overdue` : "All within schedule"}
+            </div>
+          </Link>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -107,7 +134,9 @@ function Home() {
                       <td className="px-5 py-2.5 font-medium text-primary hover:underline">
                         {s.invoice_number}
                       </td>
-                      <td className="px-2 py-2.5 text-muted-foreground">{s.customer_name}</td>
+                      <td className="px-2 py-2.5 text-muted-foreground">
+                        {s.customer_name || "Walk-in"}
+                      </td>
                       <td className="px-2 py-2.5 text-xs text-muted-foreground">
                         {new Date(s.created_at).toLocaleTimeString("en-IN", {
                           hour: "2-digit",

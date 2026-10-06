@@ -30,9 +30,13 @@ const NAV_KEYS: [string, string][] = [
 const BILLING_KEYS: [string, string][] = [
   ["Type + Enter", "Search a product and add the highlighted result"],
   ["3 * item", "Add 3 of that item in one go (qty * search)"],
+  [
+    "Enter (Qty/Weight)",
+    "Jumps straight back to product search for the next item - value is pre-selected to overtype",
+  ],
   ["↑ / ↓", "Move through search results, customer matches, or cart rows"],
   ["Esc", "Jump back to the product search box from anywhere"],
-  ["Tab", "Move to the next box, including Qty → Rate → Discount → Delete"],
+  ["Tab", "Move to the next box, including Rate → Discount → Delete"],
   ["F5", "Jump to / change the customer"],
   ["F6", "Hold this bill"],
   ["F7", "Clear this bill and start over"],

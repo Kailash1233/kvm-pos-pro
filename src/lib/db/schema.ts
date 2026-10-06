@@ -5,7 +5,7 @@
  * Financial records are never physically deleted - they are cancelled/voided.
  */
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const MIGRATIONS: { version: number; sql: string }[] = [
   {
@@ -338,6 +338,55 @@ ALTER TABLE products ADD COLUMN image TEXT;
     version: 3,
     sql: `
 ALTER TABLE sales ADD COLUMN gst_applied INTEGER NOT NULL DEFAULT 1;
+`,
+  },
+  {
+    version: 4,
+    sql: `
+ALTER TABLE products ADD COLUMN pricing_type TEXT NOT NULL DEFAULT 'UNIT';
+ALTER TABLE sale_items ADD COLUMN pricing_type TEXT NOT NULL DEFAULT 'UNIT';
+ALTER TABLE sale_items ADD COLUMN pieces INTEGER;
+ALTER TABLE sales ADD COLUMN customer_phone TEXT;
+ALTER TABLE sales ADD COLUMN transport_charge INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS credit_invoice_entries (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_id        INTEGER NOT NULL REFERENCES sales(id),
+  sale_item_id   INTEGER NOT NULL REFERENCES sale_items(id),
+  product_id     INTEGER NOT NULL REFERENCES products(id),
+  product_number TEXT NOT NULL,
+  product_name   TEXT NOT NULL,
+  unit           TEXT,
+  pricing_type   TEXT NOT NULL DEFAULT 'UNIT',
+  customer_id    INTEGER REFERENCES customers(id),
+  customer_name  TEXT NOT NULL,
+  customer_phone TEXT NOT NULL,
+  rate           INTEGER NOT NULL DEFAULT 0,
+  billed_qty     INTEGER NOT NULL,
+  delivered_qty  INTEGER NOT NULL DEFAULT 0,
+  status         TEXT NOT NULL DEFAULT 'PENDING',
+  bill_date      TEXT NOT NULL,
+  created_by     TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cie_status ON credit_invoice_entries(status);
+CREATE INDEX IF NOT EXISTS idx_cie_product ON credit_invoice_entries(product_id);
+CREATE INDEX IF NOT EXISTS idx_cie_customer ON credit_invoice_entries(customer_id);
+CREATE INDEX IF NOT EXISTS idx_cie_sale ON credit_invoice_entries(sale_id);
+
+CREATE TABLE IF NOT EXISTS credit_invoice_log (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  entry_id   INTEGER NOT NULL REFERENCES credit_invoice_entries(id),
+  event_type TEXT NOT NULL,
+  qty        INTEGER NOT NULL DEFAULT 0,
+  ref_type   TEXT,
+  ref_id     INTEGER,
+  notes      TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cil_entry ON credit_invoice_log(entry_id);
 `,
   },
 ];

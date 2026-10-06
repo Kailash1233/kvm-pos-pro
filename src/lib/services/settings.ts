@@ -18,6 +18,16 @@ export interface BusinessSettings {
   logo: string | null;
   lastBackup: string;
   roundOff: boolean;
+  /** Whether a new bill charges GST by default; the per-bill "Charge GST" toggle can always override it. */
+  defaultGstApplied: boolean;
+  /** Printed title for a non-GST bill, e.g. "ESTIMATE", "Cash Bill", "Delivery Bill". */
+  estimateTitle: string;
+  /** Invoice-number prefix for non-GST bills, kept in a separate numbering series from invoicePrefix. */
+  estimatePrefix: string;
+  /** Days a Credit Invoice entry can stay pending before it's highlighted as overdue. */
+  creditInvoicePendingDays: number;
+  /** Extra units the shop has added, on top of the built-in list. */
+  customUnits: string[];
 }
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
@@ -37,6 +47,11 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   logo: null,
   lastBackup: "",
   roundOff: true,
+  defaultGstApplied: false,
+  estimateTitle: "ESTIMATE",
+  estimatePrefix: "EST",
+  creditInvoicePendingDays: 3,
+  customUnits: [],
 };
 
 export function getSettings(): BusinessSettings {

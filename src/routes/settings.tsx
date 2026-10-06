@@ -282,10 +282,22 @@ function Settings() {
             />
           </div>
         </Field>
-        <Field label="Invoice prefix">
+        <Field label="Invoice prefix (GST bills)">
           <Input
             value={form.invoicePrefix}
             onChange={(e) => setForm({ ...form, invoicePrefix: e.target.value.toUpperCase() })}
+          />
+        </Field>
+        <Field label="Estimate prefix (non-GST bills)">
+          <Input
+            value={form.estimatePrefix}
+            onChange={(e) => setForm({ ...form, estimatePrefix: e.target.value.toUpperCase() })}
+          />
+        </Field>
+        <Field label="Non-GST bill title">
+          <Input
+            value={form.estimateTitle}
+            onChange={(e) => setForm({ ...form, estimateTitle: e.target.value.toUpperCase() })}
           />
         </Field>
         <Field label="Bill size">
@@ -308,6 +320,19 @@ function Settings() {
             onChange={(e) => setForm({ ...form, invoiceFooter: e.target.value })}
           />
         </Field>
+        <div className="flex items-center justify-between rounded-md border border-border p-4 md:col-span-2">
+          <div>
+            <div className="font-medium">Charge GST by default on new bills</div>
+            <p className="text-sm text-muted-foreground">
+              The "Charge GST" switch on Billing always starts from this; most shops leave it off
+              for everyday cash sales and switch it on only when a tax invoice is needed.
+            </p>
+          </div>
+          <Switch
+            checked={form.defaultGstApplied}
+            onCheckedChange={(v) => setForm({ ...form, defaultGstApplied: v })}
+          />
+        </div>
         <div className="flex items-center justify-between rounded-md border border-border p-4 md:col-span-2">
           <div>
             <div className="font-medium">Round bill totals to the nearest rupee</div>

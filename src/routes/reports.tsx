@@ -379,7 +379,7 @@ function ReportBody({
           return cancelledBills(filter).map((r) => ({
             Invoice: r.invoice_number,
             Date: r.sale_date,
-            Customer: r.customer_name,
+            Customer: r.customer_name || "Walk-in",
             Amount: Money(r.total),
             Reason: r.cancel_reason ?? "-",
             "Cancelled By": r.cancelled_by ?? "-",
@@ -389,7 +389,7 @@ function ReportBody({
             "Return No": r.return_number,
             Date: r.return_date,
             Invoice: r.invoice_number,
-            Customer: r.customer_name,
+            Customer: r.customer_name || "Walk-in",
             Reason: r.reason ?? "-",
             Amount: Money(r.total),
           }));

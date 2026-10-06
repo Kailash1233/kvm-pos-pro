@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BillingRouteImport } from './routes/billing'
+import { Route as CreditInvoicesRouteImport } from './routes/credit-invoices'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as GstRouteImport } from './routes/gst'
 import { Route as ProductsRouteImport } from './routes/products'
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
 const BillingRoute = BillingRouteImport.update({
   id: '/billing',
   path: '/billing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreditInvoicesRoute = CreditInvoicesRouteImport.update({
+  id: '/credit-invoices',
+  path: '/credit-invoices',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CustomersRoute = CustomersRouteImport.update({
@@ -80,6 +86,7 @@ const SuppliersRoute = SuppliersRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
+  '/credit-invoices': typeof CreditInvoicesRoute
   '/customers': typeof CustomersRoute
   '/gst': typeof GstRoute
   '/products': typeof ProductsRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
+  '/credit-invoices': typeof CreditInvoicesRoute
   '/customers': typeof CustomersRoute
   '/gst': typeof GstRoute
   '/products': typeof ProductsRoute
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
+  '/credit-invoices': typeof CreditInvoicesRoute
   '/customers': typeof CustomersRoute
   '/gst': typeof GstRoute
   '/products': typeof ProductsRoute
@@ -122,6 +131,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/billing'
+    | '/credit-invoices'
     | '/customers'
     | '/gst'
     | '/products'
@@ -135,6 +145,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/billing'
+    | '/credit-invoices'
     | '/customers'
     | '/gst'
     | '/products'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/billing'
+    | '/credit-invoices'
     | '/customers'
     | '/gst'
     | '/products'
@@ -162,6 +174,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BillingRoute: typeof BillingRoute
+  CreditInvoicesRoute: typeof CreditInvoicesRoute
   CustomersRoute: typeof CustomersRoute
   GstRoute: typeof GstRoute
   ProductsRoute: typeof ProductsRoute
@@ -187,6 +200,13 @@ declare module '@tanstack/react-router' {
       path: '/billing'
       fullPath: '/billing'
       preLoaderRoute: typeof BillingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/credit-invoices': {
+      id: '/credit-invoices'
+      path: '/credit-invoices'
+      fullPath: '/credit-invoices'
+      preLoaderRoute: typeof CreditInvoicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/customers': {
@@ -258,6 +278,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BillingRoute: BillingRoute,
+  CreditInvoicesRoute: CreditInvoicesRoute,
   CustomersRoute: CustomersRoute,
   GstRoute: GstRoute,
   ProductsRoute: ProductsRoute,

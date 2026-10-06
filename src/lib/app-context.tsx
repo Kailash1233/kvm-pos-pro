@@ -152,6 +152,11 @@ function getDefault(): BusinessSettings {
     logo: null,
     lastBackup: "",
     roundOff: true,
+    defaultGstApplied: false,
+    estimateTitle: "ESTIMATE",
+    estimatePrefix: "EST",
+    creditInvoicePendingDays: 3,
+    customUnits: [],
   };
 }
 

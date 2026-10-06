@@ -11,6 +11,7 @@ import { useApp, useQueryData } from "@/lib/app-context";
 import { rupees, formatQty } from "@/lib/money";
 import { getSale } from "@/lib/services/sales";
 import { getCustomer } from "@/lib/services/customers";
+import { pendingDeliveriesForSale } from "@/lib/services/creditInvoices";
 import { printInvoice } from "@/lib/services/print";
 
 /** Shows a past bill's items and payments, with reprint. Used from Sales and Home. */
@@ -34,6 +35,7 @@ export function BillViewDialog({
         payments: viewing.payments,
         customer,
         outstanding: customer?.outstanding,
+        pendingDeliveries: pendingDeliveriesForSale(viewing.sale.id),
       },
       settings,
     );
@@ -50,7 +52,7 @@ export function BillViewDialog({
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <span className="text-muted-foreground">Customer: </span>
-                {viewing.sale.customer_name}
+                {viewing.sale.customer_name || "Walk-in"}
               </div>
               <div>
                 <span className="text-muted-foreground">Date: </span>

@@ -4,6 +4,12 @@ import { addMovement, currentStock } from "./inventory";
 import { logAudit } from "./audit";
 import { getSettings, rawSetting, setRawSetting } from "./settings";
 import { addCustomerLedgerEntry } from "./customers";
+import {
+  adjustCreditInvoiceForReturn,
+  cancelCreditInvoicesForSale,
+  createCreditInvoiceEntry,
+  freeStock,
+} from "./creditInvoices";
 
 export type PaymentMethod = "CASH" | "UPI" | "CARD" | "CREDIT" | "OTHER";
 
@@ -12,6 +18,8 @@ export interface BillLineInput {
   qty: number;
   price: number;
   discount: number;
+  /** Informational only for a "KG"-priced product - never affects the amount. */
+  pieces?: number | null;
 }
 
 export interface BillPaymentInput {
@@ -22,6 +30,10 @@ export interface BillPaymentInput {
 
 export interface SaveBillInput {
   customerId: number | null;
+  /** Free-text name, used when no customer is linked. Ignored when customerId is set. */
+  customerName?: string;
+  /** Free-text phone, used when no customer is linked. Ignored when customerId is set. */
+  customerPhone?: string;
   billDiscount: number;
   lines: BillLineInput[];
   payments: BillPaymentInput[];
@@ -32,6 +44,8 @@ export interface SaveBillInput {
   payFull?: PaymentMethod;
   /** false for a no-GST cash sale - every line is taxed at 0% and stored that way. */
   gstApplied?: boolean;
+  /** Paise, added to the grand total after GST (never taxed) - "Vandi Vadagai". */
+  transportCharge?: number;
 }
 
 export interface Sale {
@@ -40,6 +54,7 @@ export interface Sale {
   sale_date: string;
   customer_id: number | null;
   customer_name: string;
+  customer_phone: string | null;
   customer_gstin: string | null;
   customer_type: string | null;
   interstate: number;
@@ -50,6 +65,7 @@ export interface Sale {
   sgst: number;
   igst: number;
   round_off: number;
+  transport_charge: number;
   total: number;
   paid: number;
   credit_amount: number;
@@ -71,6 +87,8 @@ export interface SaleItem {
   brand: string | null;
   hsn: string | null;
   unit: string | null;
+  pricing_type: string;
+  pieces: number | null;
   qty: number;
   price: number;
   discount: number;
@@ -108,6 +126,17 @@ export function nextInvoiceNumber(): string {
   return `${s.invoicePrefix}-${fy}-${String(next).padStart(6, "0")}`;
 }
 
+/** Separate numbering series for non-GST bills, so it never mixes with tax invoice numbers. */
+export function nextEstimateNumber(): string {
+  const s = getSettings();
+  const fy = financialYear();
+  const key = `estimate_seq_${fy}`;
+  const current = Number(rawSetting(key) ?? "0");
+  const next = current + 1;
+  setRawSetting(key, String(next));
+  return `${s.estimatePrefix}-${fy}-${String(next).padStart(6, "0")}`;
+}
+
 export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber: string } {
   if (!input.lines.length) throw new Error("Add at least one product before saving the bill.");
 
@@ -116,16 +145,24 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
     ? one<{
         id: number;
         name: string;
+        phone: string | null;
         gstin: string | null;
         type: string;
         state_code: string | null;
-      }>("SELECT id, name, gstin, type, state_code FROM customers WHERE id = ?", [input.customerId])
+      }>("SELECT id, name, phone, gstin, type, state_code FROM customers WHERE id = ?", [
+        input.customerId,
+      ])
     : null;
   if (input.customerId && !customer)
     throw new Error("That customer is no longer available. Please choose another.");
 
   const interstate =
     !!customer?.state_code && !!settings.stateCode && customer.state_code !== settings.stateCode;
+
+  // A linked customer's own record always wins; otherwise fall back to whatever free text
+  // was typed (trimmed), or '' for a genuine anonymous walk-in - never a placeholder string.
+  const resolvedName = customer?.name ?? (input.customerName ?? "").trim();
+  const resolvedPhone = customer?.phone ?? ((input.customerPhone ?? "").trim() || null);
 
   const products = input.lines.map((l) => {
     const p = one<{
@@ -138,6 +175,7 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
       unit: string;
       gst_rate: number;
       purchase_price: number;
+      pricing_type: string;
       active: number;
     }>("SELECT * FROM products WHERE id = ?", [l.productId]);
     if (!p) throw new Error("One of the products on this bill is no longer available.");
@@ -168,24 +206,30 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
     .filter((p) => p.method === "CREDIT")
     .reduce((s, p) => s + p.amount, 0);
 
+  // Transport is added after GST, never taxed - same treatment as round-off.
+  const transportCharge = Math.max(0, input.transportCharge ?? 0);
+  const grandTotal = totals.total + transportCharge;
+
   if (credit > 0 && !customer)
     throw new Error("Credit bills need a customer. Please select the customer first.");
-  if (paid + credit !== totals.total)
+  if (paid + credit !== grandTotal)
     throw new Error("The payment amounts do not add up to the bill total.");
 
   return transaction(() => {
-    const invoiceNumber = nextInvoiceNumber();
+    const invoiceNumber = gstApplied ? nextInvoiceNumber() : nextEstimateNumber();
     const ts = nowIso();
     const saleId = insert(
-      `INSERT INTO sales(invoice_number, sale_date, customer_id, customer_name, customer_gstin,
-        customer_type, interstate, subtotal, discount, taxable, cgst, sgst, igst, round_off,
-        total, paid, credit_amount, gst_applied, status, notes, created_by, created_at)
-       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'ACTIVE', ?,?,?)`,
+      `INSERT INTO sales(invoice_number, sale_date, customer_id, customer_name, customer_phone,
+        customer_gstin, customer_type, interstate, subtotal, discount, taxable, cgst, sgst, igst,
+        round_off, transport_charge, total, paid, credit_amount, gst_applied, status, notes,
+        created_by, created_at)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'ACTIVE', ?,?,?)`,
       [
         invoiceNumber,
         ts.slice(0, 10),
         customer?.id ?? null,
-        customer?.name ?? "Walk-in Customer",
+        resolvedName,
+        resolvedPhone,
         customer?.gstin ?? null,
         customer?.type ?? "Walk-in",
         interstate ? 1 : 0,
@@ -196,7 +240,8 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
         totals.sgst,
         totals.igst,
         totals.roundOff,
-        totals.total,
+        transportCharge,
+        grandTotal,
         paid,
         credit,
         gstApplied ? 1 : 0,
@@ -209,10 +254,11 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
     input.lines.forEach((l, i) => {
       const p = products[i]!;
       const t = lines[i]!;
-      insert(
+      const saleItemId = insert(
         `INSERT INTO sale_items(sale_id, product_id, product_number, product_name, category, brand,
-          hsn, unit, qty, price, discount, gst_rate, taxable, cgst, sgst, igst, total, cost)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          hsn, unit, pricing_type, pieces, qty, price, discount, gst_rate, taxable, cgst, sgst,
+          igst, total, cost)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           saleId,
           p.id,
@@ -222,6 +268,8 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
           p.brand,
           p.hsn,
           p.unit,
+          p.pricing_type,
+          l.pieces ?? null,
           l.qty,
           l.price,
           t.discount,
@@ -234,16 +282,53 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
           p.purchase_price,
         ],
       );
-      addMovement({
-        productId: p.id,
-        type: "SALE",
-        qty: -l.qty,
-        refType: "SALE",
-        refId: saleId,
-        refLabel: invoiceNumber,
-        unitCost: p.purchase_price,
-        user: input.user,
-      });
+
+      // Billing beyond stock is allowed: whatever's actually free is handed
+      // over (and deducted) now; any shortfall becomes a Credit Invoice
+      // entry instead of ever taking physical stock negative. Re-reads live
+      // so a second line of the same product in this same bill can't
+      // double-allocate the same free stock.
+      const free = freeStock(p.id);
+      const deliverNow = Math.max(0, Math.min(l.qty, free));
+      const shortfall = l.qty - deliverNow;
+      if (shortfall > 0 && (!resolvedName.trim() || !resolvedPhone)) {
+        throw new Error(
+          `Only ${deliverNow} of ${p.name} is available - a Credit Invoice for the rest needs a customer name and phone number.`,
+        );
+      }
+
+      if (deliverNow > 0) {
+        addMovement({
+          productId: p.id,
+          type: "SALE",
+          qty: -deliverNow,
+          refType: "SALE",
+          refId: saleId,
+          refLabel: invoiceNumber,
+          unitCost: p.purchase_price,
+          user: input.user,
+        });
+      }
+
+      if (shortfall > 0) {
+        createCreditInvoiceEntry({
+          saleId,
+          saleItemId,
+          productId: p.id,
+          productNumber: p.product_number,
+          productName: p.name,
+          unit: p.unit,
+          pricingType: p.pricing_type,
+          customerId: customer?.id ?? null,
+          customerName: resolvedName,
+          customerPhone: resolvedPhone ?? "",
+          rate: l.price,
+          billedQty: l.qty,
+          deliveredNow: deliverNow,
+          billDate: ts.slice(0, 10),
+          user: input.user,
+        });
+      }
     });
 
     for (const pay of input.payments) {
@@ -272,7 +357,7 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
       action: "BILL_CREATED",
       entity: "sales",
       entityId: saleId,
-      newValue: { invoiceNumber, total: totals.total, credit },
+      newValue: { invoiceNumber, total: grandTotal, credit },
     });
     if (input.creditApprovedBy) {
       logAudit({
@@ -364,18 +449,30 @@ export function cancelBill(saleId: number, reason: string, user: string): void {
       saleId,
     ]);
     for (const item of found.items) {
-      addMovement({
-        productId: item.product_id,
-        type: "SALES_RETURN",
-        qty: item.qty,
-        refType: "SALE_CANCEL",
-        refId: saleId,
-        refLabel: found.sale.invoice_number,
-        unitCost: item.cost,
-        notes: "Bill cancelled",
-        user,
-      });
+      // A line with a Credit Invoice entry only ever had its delivered
+      // portion physically deducted - reverse that, not the full billed
+      // qty, or cancelling would phantom-inflate stock by what was never
+      // actually handed out.
+      const entry = one<{ delivered_qty: number }>(
+        "SELECT delivered_qty FROM credit_invoice_entries WHERE sale_item_id = ? AND status != 'CANCELLED'",
+        [item.id],
+      );
+      const reverseQty = entry ? entry.delivered_qty : item.qty;
+      if (reverseQty > 0) {
+        addMovement({
+          productId: item.product_id,
+          type: "SALES_RETURN",
+          qty: reverseQty,
+          refType: "SALE_CANCEL",
+          refId: saleId,
+          refLabel: found.sale.invoice_number,
+          unitCost: item.cost,
+          notes: "Bill cancelled",
+          user,
+        });
+      }
     }
+    cancelCreditInvoicesForSale(saleId, user);
     if (found.sale.credit_amount > 0 && found.sale.customer_id) {
       addCustomerLedgerEntry({
         customerId: found.sale.customer_id,
@@ -468,6 +565,7 @@ export function saveSalesReturn(params: {
         unitCost: item.cost,
         user: params.user,
       });
+      adjustCreditInvoiceForReturn(item.id, line.qty, params.user);
     }
 
     run("UPDATE sales_returns SET total = ? WHERE id = ?", [total, returnId]);

@@ -111,7 +111,7 @@ function SalesRegister({ filter }: { filter: RangeFilter }) {
   const exportRows = rows.map((r) => ({
     Invoice: r.invoice_number,
     Date: r.sale_date,
-    Customer: r.customer_name,
+    Customer: r.customer_name || "Walk-in",
     GSTIN: r.customer_gstin ?? "-",
     Taxable: toRupeeNumber(r.taxable),
     CGST: toRupeeNumber(r.cgst),
@@ -163,7 +163,7 @@ function SalesRegister({ filter }: { filter: RangeFilter }) {
                 <tr key={r.invoice_number} className="border-t border-border">
                   <td className="px-3 py-2 font-medium">{r.invoice_number}</td>
                   <td className="px-2 py-2 text-muted-foreground">{r.sale_date}</td>
-                  <td className="px-2 py-2">{r.customer_name}</td>
+                  <td className="px-2 py-2">{r.customer_name || "Walk-in"}</td>
                   <td className="px-2 py-2 text-muted-foreground">{r.customer_gstin ?? "-"}</td>
                   <td className="num px-2 py-2">{rupees(r.taxable)}</td>
                   <td className="num px-2 py-2">{rupees(r.cgst)}</td>

@@ -24,6 +24,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useApp } from "@/lib/app-context";
 import { formatQty, fromQty, rupees, toPaise, toQty, toRupees } from "@/lib/money";
 import {
@@ -34,6 +41,7 @@ import {
   type ProductWithStock,
 } from "@/lib/services/products";
 import { listCustomers, getCustomer, type CustomerWithBalance } from "@/lib/services/customers";
+import { freeStock, pendingDeliveriesForSale } from "@/lib/services/creditInvoices";
 import { computeBill } from "@/lib/services/gst";
 import {
   holdBill,
@@ -67,9 +75,11 @@ export const Route = createFileRoute("/billing")({
 
 interface CartLine {
   product: ProductWithStock;
-  qty: number; // milli-units
-  price: number; // paise
+  qty: number; // milli-units - weight-in-kg for a "KG" priced product, otherwise a unit count
+  price: number; // paise - rate per kg for a "KG" priced product
   discount: number; // paise
+  /** Informational only for "KG" products - never affects the amount. */
+  pieces: number | null;
 }
 
 /**
@@ -87,6 +97,7 @@ function Billing() {
   const { user, settings, refresh, version } = useApp();
   const [customer, setCustomer] = useState<CustomerWithBalance | null>(null);
   const [customerTerm, setCustomerTerm] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [showCustomers, setShowCustomers] = useState(false);
   const [customerHighlight, setCustomerHighlight] = useState(0);
   const [term, setTerm] = useState("");
@@ -102,7 +113,8 @@ function Billing() {
     OTHER: "",
   });
   const [notes, setNotes] = useState("");
-  const [gstApplied, setGstApplied] = useState(true);
+  const [transportCharge, setTransportCharge] = useState("");
+  const [gstApplied, setGstApplied] = useState(settings.defaultGstApplied);
   const [busy, setBusy] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const customerRef = useRef<HTMLInputElement>(null);
@@ -166,12 +178,38 @@ function Billing() {
     [cart, interstate, billDiscount, settings.roundOff, gstApplied],
   );
 
-  const total = calc.totals.total;
+  // Transport is added after GST, never taxed - same treatment as round-off.
+  const total = calc.totals.total + toPaise(transportCharge || 0);
   const entered = (Object.keys(payments) as PaymentMethod[]).reduce(
     (s, m) => s + toPaise(payments[m] || 0),
     0,
   );
   const remaining = total - entered;
+
+  const [pendingFocusIndex, setPendingFocusIndex] = useState<number | null>(null);
+
+  // Qty/Rate/Discount are controlled from the authoritative fixed-point
+  // number, which rounds on every keystroke - without this, typing a
+  // decimal character by character (e.g. "1.5") gets its "." silently
+  // rounded away after the first keystroke and collapses into "15". While a
+  // cell is being actively typed into, show exactly what was typed instead;
+  // only the authoritative value takes over again once the cell blurs.
+  const [cellDrafts, setCellDrafts] = useState<Record<string, string>>({});
+  function cellValue(key: string, derived: string) {
+    return cellDrafts[key] ?? derived;
+  }
+  function onCellChange(key: string, raw: string, commit: (v: string) => void) {
+    setCellDrafts((d) => ({ ...d, [key]: raw }));
+    commit(raw);
+  }
+  function onCellBlur(key: string) {
+    setCellDrafts((d) => {
+      if (!(key in d)) return d;
+      const next = { ...d };
+      delete next[key];
+      return next;
+    });
+  }
 
   const addProduct = useCallback(
     (p: ProductWithStock, qty: number = toQty(1)) => {
@@ -180,8 +218,10 @@ function Billing() {
         if (at >= 0) {
           const next = [...prev];
           next[at] = { ...next[at]!, qty: next[at]!.qty + qty };
+          setPendingFocusIndex(at);
           return next;
         }
+        setPendingFocusIndex(prev.length);
         return [
           ...prev,
           {
@@ -189,19 +229,35 @@ function Billing() {
             qty,
             price: priceForCustomerType(p, (customer?.type as never) ?? "Retail"),
             discount: 0,
+            pieces: null,
           },
         ];
       });
       setTerm("");
-      searchRef.current?.focus();
     },
     [customer],
   );
+
+  // A product was just added - the new row doesn't exist in the DOM yet at
+  // the moment addProduct ran, so focus it (with its value selected, ready
+  // to overtype) once this render has actually put it on the page.
+  useEffect(() => {
+    if (pendingFocusIndex === null) return;
+    const el = document.getElementById(`cart-qty-${pendingFocusIndex}`) as HTMLInputElement | null;
+    if (el) {
+      el.focus();
+      el.select();
+    } else {
+      searchRef.current?.focus();
+    }
+    setPendingFocusIndex(null);
+  }, [pendingFocusIndex, cart]);
 
   const selectCustomer = useCallback((c: CustomerWithBalance) => {
     setCustomer(c);
     setShowCustomers(false);
     setCustomerTerm("");
+    setCustomerPhone("");
     setCart((prev) =>
       prev.map((l) => ({ ...l, price: priceForCustomerType(l.product, c.type as never) })),
     );
@@ -232,8 +288,10 @@ function Billing() {
 
   /**
    * Excel-style keyboard nav for the cart grid: Up/Down moves to the same
-   * column in the next/previous row, Enter moves right (Qty -> Rate ->
-   * Discount -> back to search), Esc jumps straight back to search.
+   * column in the next/previous row, Esc jumps straight back to search.
+   * Enter in Qty/Weight goes straight back to search (that's the fast path:
+   * search -> add -> type qty -> Enter -> next product); Enter in Rate or
+   * Discount still moves right (Rate -> Discount -> back to search).
    */
   const CART_COLS = ["qty", "rate", "discount"] as const;
   function cartCellKeyDown(
@@ -250,6 +308,11 @@ function Billing() {
       else document.getElementById(`cart-${col}-${row - 1}`)?.focus();
     } else if (e.key === "Enter") {
       e.preventDefault();
+      if (col === "qty") {
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
       const nextCol = CART_COLS[CART_COLS.indexOf(col) + 1];
       if (nextCol) document.getElementById(`cart-${nextCol}-${row}`)?.focus();
       else searchRef.current?.focus();
@@ -261,13 +324,16 @@ function Billing() {
 
   function resetBill() {
     setCart([]);
+    setCellDrafts({});
     setCustomer(null);
     setCustomerTerm("");
+    setCustomerPhone("");
     setBillDiscount("");
+    setTransportCharge("");
     setPayments({ CASH: "", UPI: "", CARD: "", CREDIT: "", OTHER: "" });
     setNotes("");
     setTerm("");
-    setGstApplied(true);
+    setGstApplied(settings.defaultGstApplied);
     searchRef.current?.focus();
   }
 
@@ -303,21 +369,35 @@ function Billing() {
         toast.error("Credit bills need a customer. Please choose the customer first.");
         return;
       }
+      const hasPendingLine = cart.some((l) => l.qty - freeStock(l.product.id, l.product.stock) > 0);
+      const resolvedPhoneOk = customer ? !!customer.phone : !!customerPhone.trim();
+      const resolvedNameOk = customer ? !!customer.name : !!customerTerm.trim();
+      if (hasPendingLine && (!resolvedNameOk || !resolvedPhoneOk)) {
+        toast.error(
+          "Some items here go to a Credit Invoice for the missing stock - please enter the customer's name and phone number first.",
+        );
+        customerRef.current?.focus();
+        return;
+      }
       setBusy(true);
       try {
         const { saleId, invoiceNumber } = saveBill({
           customerId: customer?.id ?? null,
+          customerName: customer ? undefined : customerTerm,
+          customerPhone: customer ? undefined : customerPhone,
           billDiscount: toPaise(billDiscount || 0),
           lines: cart.map((l) => ({
             productId: l.product.id,
             qty: l.qty,
             price: l.price,
             discount: l.discount,
+            pieces: l.pieces,
           })),
           payments: list,
           notes,
           user: user.full_name,
           gstApplied,
+          transportCharge: toPaise(transportCharge || 0),
         });
         toast.success(`Bill ${invoiceNumber} saved`);
         if (print) {
@@ -337,6 +417,7 @@ function Billing() {
                     }
                   : null,
                 outstanding: customer ? getCustomer(customer.id)?.outstanding : 0,
+                pendingDeliveries: pendingDeliveriesForSale(saleId),
               },
               settings,
             );
@@ -352,9 +433,12 @@ function Billing() {
     [
       cart,
       customer,
+      customerTerm,
+      customerPhone,
       payments,
       total,
       billDiscount,
+      transportCharge,
       notes,
       user,
       settings,
@@ -406,16 +490,21 @@ function Billing() {
   function hold() {
     if (!cart.length || !user) return;
     holdBill(
-      customer?.name ?? "Walk-in",
+      customer?.name ?? customerTerm ?? "Walk-in",
       {
         customerId: customer?.id ?? null,
+        customerName: customer ? undefined : customerTerm,
+        customerPhone: customer ? undefined : customerPhone,
         billDiscount,
+        transportCharge,
         notes,
+        gstApplied,
         lines: cart.map((l) => ({
           productId: l.product.id,
           qty: l.qty,
           price: l.price,
           discount: l.discount,
+          pieces: l.pieces,
         })),
       },
       user.full_name,
@@ -429,19 +518,40 @@ function Billing() {
     try {
       const data = JSON.parse(payload) as {
         customerId: number | null;
+        customerName?: string;
+        customerPhone?: string;
         billDiscount: string;
+        transportCharge?: string;
         notes: string;
-        lines: { productId: number; qty: number; price: number; discount: number }[];
+        gstApplied?: boolean;
+        lines: {
+          productId: number;
+          qty: number;
+          price: number;
+          discount: number;
+          pieces?: number | null;
+        }[];
       };
       const lines: CartLine[] = [];
       for (const l of data.lines) {
         const p = searchProducts("", { limit: 1000 }).find((x) => x.id === l.productId);
-        if (p) lines.push({ product: p, qty: l.qty, price: l.price, discount: l.discount });
+        if (p)
+          lines.push({
+            product: p,
+            qty: l.qty,
+            price: l.price,
+            discount: l.discount,
+            pieces: l.pieces ?? null,
+          });
       }
       setCart(lines);
       setCustomer(data.customerId ? getCustomer(data.customerId) : null);
+      setCustomerTerm(data.customerId ? "" : data.customerName || "");
+      setCustomerPhone(data.customerId ? "" : data.customerPhone || "");
       setBillDiscount(data.billDiscount || "");
+      setTransportCharge(data.transportCharge || "");
       setNotes(data.notes || "");
+      setGstApplied(data.gstApplied ?? settings.defaultGstApplied);
       removeHeldBill(id);
       refresh();
     } catch {
@@ -541,9 +651,15 @@ function Billing() {
                         }
                       }}
                     />
+                    <Input
+                      className="mt-1.5"
+                      placeholder="Phone (optional)"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                    />
                     <p className="mt-1 text-xs text-muted-foreground">
-                      In a hurry? Leave this blank — the bill saves as{" "}
-                      <span className="font-medium">Walk-in Customer</span>, no name needed.
+                      In a hurry? Leave both blank — the bill saves as a plain walk-in sale, no name
+                      printed.
                     </p>
                     {showCustomers && customerMatches.length ? (
                       <ul className="panel absolute z-20 mt-1 max-h-60 w-full overflow-auto p-1">
@@ -654,7 +770,7 @@ function Billing() {
               <thead className="bg-secondary text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="min-w-64 px-4 py-2.5 text-left">Item</th>
-                  <th className="w-28 px-2 py-2.5 text-right">Qty</th>
+                  <th className="w-28 px-2 py-2.5 text-right">Qty / Weight</th>
                   <th className="w-28 px-2 py-2.5 text-right">Rate</th>
                   <th className="w-28 px-2 py-2.5 text-right">Discount</th>
                   <th className="w-24 px-2 py-2.5 text-right">GST</th>
@@ -672,7 +788,10 @@ function Billing() {
                 ) : (
                   cart.map((l, i) => {
                     const line = calc.lines[i]!;
-                    const over = l.qty > l.product.stock;
+                    const isKg = l.product.pricing_type === "KG";
+                    const free = freeStock(l.product.id, l.product.stock);
+                    const shortfallQty = l.qty - free;
+                    const over = shortfallQty > 0;
                     return (
                       <tr key={l.product.id} className="border-t border-border">
                         <td className="px-4 py-2">
@@ -680,38 +799,80 @@ function Billing() {
                           <div className="text-xs text-muted-foreground">
                             {l.product.product_number} · in stock {formatQty(l.product.stock)}{" "}
                             {l.product.unit}
-                            {over ? (
-                              <span className="ml-2 text-warning">more than available</span>
+                          </div>
+                          {over ? (
+                            <div className="mt-0.5 text-xs text-warning">
+                              Only {formatQty(Math.max(free, 0))} {l.product.unit} in stock —{" "}
+                              {formatQty(shortfallQty)} {l.product.unit} will be added to Credit
+                              Invoice
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Input
+                              id={`cart-qty-${i}`}
+                              className="num h-9 w-24"
+                              value={cellValue(`qty-${i}`, String(fromQty(l.qty)))}
+                              onChange={(e) =>
+                                onCellChange(`qty-${i}`, e.target.value, (v) =>
+                                  updateLine(i, { qty: toQty(v || 0) }),
+                                )
+                              }
+                              onKeyDown={(e) => cartCellKeyDown(e, i, "qty")}
+                              onFocus={(e) => e.target.select()}
+                              onBlur={() => onCellBlur(`qty-${i}`)}
+                            />
+                            {isKg ? (
+                              <span className="text-xs text-muted-foreground">kg</span>
+                            ) : null}
+                          </div>
+                          {isKg ? (
+                            <Input
+                              className="num mt-1 h-7 w-24 text-xs"
+                              placeholder="No. of pieces"
+                              value={l.pieces != null ? String(l.pieces) : ""}
+                              onChange={(e) =>
+                                updateLine(i, {
+                                  pieces: e.target.value ? Number(e.target.value) : null,
+                                })
+                              }
+                            />
+                          ) : null}
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Input
+                              id={`cart-rate-${i}`}
+                              className="num h-9 w-24"
+                              value={cellValue(`rate-${i}`, String(toRupees(l.price)))}
+                              onChange={(e) =>
+                                onCellChange(`rate-${i}`, e.target.value, (v) =>
+                                  updateLine(i, { price: toPaise(v || 0) }),
+                                )
+                              }
+                              onKeyDown={(e) => cartCellKeyDown(e, i, "rate")}
+                              onFocus={(e) => e.target.select()}
+                              onBlur={() => onCellBlur(`rate-${i}`)}
+                            />
+                            {isKg ? (
+                              <span className="text-xs text-muted-foreground">/kg</span>
                             ) : null}
                           </div>
                         </td>
                         <td className="px-2 py-2 text-right">
                           <Input
-                            id={`cart-qty-${i}`}
-                            className="num h-9 w-24"
-                            value={String(fromQty(l.qty))}
-                            onChange={(e) => updateLine(i, { qty: toQty(e.target.value || 0) })}
-                            onKeyDown={(e) => cartCellKeyDown(e, i, "qty")}
-                          />
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          <Input
-                            id={`cart-rate-${i}`}
-                            className="num h-9 w-24"
-                            value={String(toRupees(l.price))}
-                            onChange={(e) => updateLine(i, { price: toPaise(e.target.value || 0) })}
-                            onKeyDown={(e) => cartCellKeyDown(e, i, "rate")}
-                          />
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          <Input
                             id={`cart-discount-${i}`}
                             className="num h-9 w-24"
-                            value={String(toRupees(l.discount))}
+                            value={cellValue(`discount-${i}`, String(toRupees(l.discount)))}
                             onChange={(e) =>
-                              updateLine(i, { discount: toPaise(e.target.value || 0) })
+                              onCellChange(`discount-${i}`, e.target.value, (v) =>
+                                updateLine(i, { discount: toPaise(v || 0) }),
+                              )
                             }
                             onKeyDown={(e) => cartCellKeyDown(e, i, "discount")}
+                            onFocus={(e) => e.target.select()}
+                            onBlur={() => onCellBlur(`discount-${i}`)}
                           />
                         </td>
                         <td className="num px-2 py-2">
@@ -723,7 +884,10 @@ function Billing() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setCart(cart.filter((_, idx) => idx !== i))}
+                            onClick={() => {
+                              setCart(cart.filter((_, idx) => idx !== i));
+                              setCellDrafts({});
+                            }}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -734,6 +898,30 @@ function Billing() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="panel flex items-center justify-between gap-3 p-4">
+            <Label className="text-sm font-medium">Transport Charges (Vandi Vadagai)</Label>
+            <div className="flex items-center gap-2">
+              <Select value="" onValueChange={(v) => setTransportCharge(v)}>
+                <SelectTrigger className="h-9 w-28">
+                  <SelectValue placeholder="Preset" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[250, 300, 350, 400, 450, 500].map((v) => (
+                    <SelectItem key={v} value={String(v)}>
+                      {rupees(toPaise(v))}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                className="num h-9 w-28"
+                placeholder="0"
+                value={transportCharge}
+                onChange={(e) => setTransportCharge(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
@@ -779,6 +967,12 @@ function Billing() {
               ) : null}
               {calc.totals.roundOff ? (
                 <Row label="Round off" value={rupees(calc.totals.roundOff)} />
+              ) : null}
+              {toPaise(transportCharge || 0) > 0 ? (
+                <Row
+                  label="Transport (Vandi Vadagai)"
+                  value={rupees(toPaise(transportCharge || 0))}
+                />
               ) : null}
             </dl>
             <div className="mt-3 flex items-end justify-between border-t border-border pt-3">

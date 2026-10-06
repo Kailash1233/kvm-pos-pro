@@ -3,12 +3,46 @@ import type { BusinessSettings } from "./settings";
 import type { Sale, SaleItem, SalePayment } from "./sales";
 
 const esc = (v: unknown) =>
-  String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+  String(v ?? "").replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!,
+  );
 
 const inWords = (paise: number): string => {
-  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
-    "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
-  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const ones = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const tens = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
   const two = (n: number): string =>
     n < 20 ? ones[n]! : `${tens[Math.floor(n / 10)]}${n % 10 ? " " + ones[n % 10] : ""}`;
   const three = (n: number): string =>
@@ -36,8 +70,28 @@ export interface InvoiceData {
   sale: Sale;
   items: SaleItem[];
   payments: SalePayment[];
-  customer?: { name: string; phone?: string | null; address?: string | null; gstin?: string | null } | null;
+  customer?: {
+    name: string;
+    phone?: string | null;
+    address?: string | null;
+    gstin?: string | null;
+  } | null;
   outstanding?: number;
+  /** Still owed from this exact bill right now - dropped off once fully delivered. */
+  pendingDeliveries?: { product_name: string; unit: string | null; pending_qty: number }[];
+}
+
+function pendingDeliveryHtml(d: InvoiceData): string {
+  if (!d.pendingDeliveries?.length) return "";
+  const rows = d.pendingDeliveries
+    .map(
+      (p) =>
+        `<li>${esc(p.product_name)} — ${formatQty(p.pending_qty)} ${esc(p.unit ?? "")} to be delivered</li>`,
+    )
+    .join("");
+  return `<div class="box" style="margin-top:8px; border-color:#c77;"><h4>Pending Delivery</h4>
+    <ul style="margin:0; padding-left:18px;">${rows}</ul>
+  </div>`;
 }
 
 function taxRows(items: SaleItem[]) {
@@ -55,18 +109,18 @@ function taxRows(items: SaleItem[]) {
 
 export function invoiceHtmlA4(d: InvoiceData, s: BusinessSettings, title = "TAX INVOICE"): string {
   const { sale, items, payments } = d;
+  const gstOn = sale.gst_applied !== 0;
   const rows = items
     .map(
       (it, i) => `<tr>
       <td class="c">${i + 1}</td>
       <td>${esc(it.product_name)}<div class="sub">${esc(it.product_number)}</div></td>
-      <td class="c">${esc(it.hsn ?? "")}</td>
-      <td class="n">${formatQty(it.qty)} ${esc(it.unit ?? "")}</td>
-      <td class="n">${toRupees(it.price).toFixed(2)}</td>
+      ${gstOn ? `<td class="c">${esc(it.hsn ?? "")}</td>` : ""}
+      <td class="n">${it.pricing_type === "KG" ? `${(it.qty / 1000).toFixed(3)} kg` : `${formatQty(it.qty)} ${esc(it.unit ?? "")}`}</td>
+      <td class="n">${toRupees(it.price).toFixed(2)}${it.pricing_type === "KG" ? "/kg" : ""}</td>
       <td class="n">${it.discount ? toRupees(it.discount).toFixed(2) : "-"}</td>
       <td class="n">${toRupees(it.taxable).toFixed(2)}</td>
-      <td class="c">${it.gst_rate}%</td>
-      <td class="n">${toRupees(it.cgst + it.sgst + it.igst).toFixed(2)}</td>
+      ${gstOn ? `<td class="c">${it.gst_rate}%</td><td class="n">${toRupees(it.cgst + it.sgst + it.igst).toFixed(2)}</td>` : ""}
       <td class="n">${toRupees(it.total).toFixed(2)}</td>
     </tr>`,
     )
@@ -85,7 +139,9 @@ export function invoiceHtmlA4(d: InvoiceData, s: BusinessSettings, title = "TAX 
     .join("");
 
   const pay = payments
-    .map((p) => `${esc(p.method)} ${rupees(p.amount)}${p.reference ? ` (${esc(p.reference)})` : ""}`)
+    .map(
+      (p) => `${esc(p.method)} ${rupees(p.amount)}${p.reference ? ` (${esc(p.reference)})` : ""}`,
+    )
     .join(" &nbsp;|&nbsp; ");
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(sale.invoice_number)}</title>
@@ -120,7 +176,7 @@ ${sale.status === "CANCELLED" ? '<div class="cancelled">CANCELLED</div>' : ""}
       <div class="biz">${esc(s.businessName)}</div>
       <div class="muted">${esc(s.address)}</div>
       <div class="muted">Phone: ${esc(s.phone)}${s.email ? " &nbsp; " + esc(s.email) : ""}</div>
-      <div><b>GSTIN:</b> ${esc(s.gstin)} &nbsp; <b>State:</b> ${esc(s.state)} (${esc(s.stateCode)})</div>
+      ${gstOn ? `<div><b>GSTIN:</b> ${esc(s.gstin)} &nbsp; <b>State:</b> ${esc(s.state)} (${esc(s.stateCode)})</div>` : ""}
     </div>
   </div>
   <div class="n">
@@ -131,12 +187,16 @@ ${sale.status === "CANCELLED" ? '<div class="cancelled">CANCELLED</div>' : ""}
 </div>
 <div class="title">${esc(title)}</div>
 <div class="grid">
-  <div class="box"><h4>Bill To</h4>
-    <div><b>${esc(d.customer?.name ?? "Walk-in Customer")}</b></div>
+  ${
+    sale.customer_name
+      ? `<div class="box"><h4>Bill To</h4>
+    <div><b>${esc(sale.customer_name)}</b></div>
     <div class="muted">${esc(d.customer?.address ?? "")}</div>
-    <div class="muted">${d.customer?.phone ? "Phone: " + esc(d.customer.phone) : ""}</div>
-    <div>${d.customer?.gstin ? "<b>GSTIN:</b> " + esc(d.customer.gstin) : ""}</div>
-  </div>
+    <div class="muted">${sale.customer_phone ? "Phone: " + esc(sale.customer_phone) : ""}</div>
+    <div>${gstOn && d.customer?.gstin ? "<b>GSTIN:</b> " + esc(d.customer.gstin) : ""}</div>
+  </div>`
+      : ""
+  }
   <div class="box"><h4>Supply</h4>
     <div>Place of supply: ${esc(s.state)} (${esc(s.stateCode)})</div>
     <div>Payment: ${pay || "-"}</div>
@@ -145,23 +205,29 @@ ${sale.status === "CANCELLED" ? '<div class="cancelled">CANCELLED</div>' : ""}
 </div>
 <table>
   <thead><tr>
-    <th>#</th><th>Description</th><th>HSN</th><th>Qty</th><th>Rate</th><th>Disc</th>
-    <th>Taxable</th><th>GST</th><th>Tax</th><th>Amount</th>
+    <th>#</th><th>Description</th>${gstOn ? "<th>HSN</th>" : ""}<th>Qty</th><th>Rate</th><th>Disc</th>
+    <th>Taxable</th>${gstOn ? "<th>GST</th><th>Tax</th>" : ""}<th>Amount</th>
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
+${pendingDeliveryHtml(d)}
 <div class="grid" style="margin-top:8px">
-  <table style="width:52%">
+  ${
+    gstOn
+      ? `<table style="width:52%">
     <thead><tr><th>Rate</th><th>Taxable</th><th>CGST</th><th>SGST</th><th>IGST</th></tr></thead>
     <tbody>${tr}</tbody>
-  </table>
+  </table>`
+      : ""
+  }
   <table class="totals">
     <tr><td>Taxable Value</td><td class="n">${rupees(sale.taxable)}</td></tr>
     ${sale.discount ? `<tr><td>Discount</td><td class="n">- ${rupees(sale.discount)}</td></tr>` : ""}
-    ${sale.cgst ? `<tr><td>CGST</td><td class="n">${rupees(sale.cgst)}</td></tr>` : ""}
-    ${sale.sgst ? `<tr><td>SGST</td><td class="n">${rupees(sale.sgst)}</td></tr>` : ""}
-    ${sale.igst ? `<tr><td>IGST</td><td class="n">${rupees(sale.igst)}</td></tr>` : ""}
+    ${gstOn && sale.cgst ? `<tr><td>CGST</td><td class="n">${rupees(sale.cgst)}</td></tr>` : ""}
+    ${gstOn && sale.sgst ? `<tr><td>SGST</td><td class="n">${rupees(sale.sgst)}</td></tr>` : ""}
+    ${gstOn && sale.igst ? `<tr><td>IGST</td><td class="n">${rupees(sale.igst)}</td></tr>` : ""}
     ${sale.round_off ? `<tr><td>Round Off</td><td class="n">${rupees(sale.round_off)}</td></tr>` : ""}
+    ${sale.transport_charge ? `<tr><td>Transport Charges (Vandi Vadagai)</td><td class="n">${rupees(sale.transport_charge)}</td></tr>` : ""}
     <tr class="grand"><td>Grand Total</td><td class="n">${rupees(sale.total)}</td></tr>
     <tr><td>Paid</td><td class="n">${rupees(sale.paid)}</td></tr>
     ${sale.credit_amount ? `<tr><td><b>Balance Due</b></td><td class="n"><b>${rupees(sale.credit_amount)}</b></td></tr>` : ""}
@@ -176,14 +242,22 @@ ${d.outstanding ? `<div style="margin-top:4px"><b>Total outstanding for this cus
 </body></html>`;
 }
 
-export function invoiceHtmlThermal(d: InvoiceData, s: BusinessSettings): string {
+export function invoiceHtmlThermal(
+  d: InvoiceData,
+  s: BusinessSettings,
+  title = "TAX INVOICE",
+): string {
   const { sale, items } = d;
-  const gstApplied = sale.gst_applied !== 0;
+  const gstOn = sale.gst_applied !== 0;
   const rows = items
-    .map(
-      (it) => `<tr><td colspan="3">${esc(it.product_name)}</td></tr>
-      <tr><td>${formatQty(it.qty)} x ${toRupees(it.price).toFixed(2)}</td><td class="c">${it.gst_rate}%</td><td class="n">${toRupees(it.total).toFixed(2)}</td></tr>`,
-    )
+    .map((it) => {
+      const qtyRate =
+        it.pricing_type === "KG"
+          ? `${(it.qty / 1000).toFixed(3)} kg @ ${toRupees(it.price).toFixed(2)}/kg`
+          : `${formatQty(it.qty)} x ${toRupees(it.price).toFixed(2)}`;
+      return `<tr><td colspan="3">${esc(it.product_name)}</td></tr>
+      <tr><td>${qtyRate}</td>${gstOn ? `<td class="c">${it.gst_rate}%</td>` : "<td></td>"}<td class="n">${toRupees(it.total).toFixed(2)}</td></tr>`;
+    })
     .join("");
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(sale.invoice_number)}</title>
 <style>
@@ -197,25 +271,76 @@ export function invoiceHtmlThermal(d: InvoiceData, s: BusinessSettings): string 
 <div class="c big">${esc(s.businessName)}</div>
 <div class="c">${esc(s.address)}</div>
 <div class="c">Ph: ${esc(s.phone)}</div>
-<div class="c">GSTIN: ${esc(s.gstin)}</div>
-${gstApplied ? "" : '<div class="c"><b>NO GST BILL</b></div>'}
+${gstOn ? `<div class="c">GSTIN: ${esc(s.gstin)}</div>` : ""}
+<div class="c"><b>${esc(title)}</b></div>
 <hr>
 <div>Bill: ${esc(sale.invoice_number)}</div>
 <div>${esc(new Date(sale.created_at).toLocaleString("en-IN"))}</div>
-<div>Customer: ${esc(d.customer?.name ?? "Walk-in")}</div>
+${sale.customer_name ? `<div>Customer: ${esc(sale.customer_name)}${sale.customer_phone ? " (" + esc(sale.customer_phone) + ")" : ""}</div>` : ""}
 <hr>
 <table>${rows}</table>
+${
+  d.pendingDeliveries?.length
+    ? `<hr><div><b>Pending Delivery</b></div>${d.pendingDeliveries
+        .map(
+          (p) =>
+            `<div>${esc(p.product_name)} — ${formatQty(p.pending_qty)} ${esc(p.unit ?? "")}</div>`,
+        )
+        .join("")}`
+    : ""
+}
 <hr>
 <table>
   <tr><td>Taxable</td><td class="n">${rupees(sale.taxable)}</td></tr>
-  <tr><td>GST</td><td class="n">${rupees(sale.cgst + sale.sgst + sale.igst)}</td></tr>
+  ${gstOn ? `<tr><td>GST</td><td class="n">${rupees(sale.cgst + sale.sgst + sale.igst)}</td></tr>` : ""}
   ${sale.round_off ? `<tr><td>Round Off</td><td class="n">${rupees(sale.round_off)}</td></tr>` : ""}
+  ${sale.transport_charge ? `<tr><td>Transport (Vandi Vadagai)</td><td class="n">${rupees(sale.transport_charge)}</td></tr>` : ""}
   <tr class="big"><td>TOTAL</td><td class="n">${rupees(sale.total)}</td></tr>
   <tr><td>Paid</td><td class="n">${rupees(sale.paid)}</td></tr>
   ${sale.credit_amount ? `<tr><td>Balance</td><td class="n">${rupees(sale.credit_amount)}</td></tr>` : ""}
 </table>
 <hr>
 <div class="c">${esc(s.invoiceFooter || "Thank you, visit again!")}</div>
+</body></html>`;
+}
+
+/** A simple delivery note for one Credit Invoice delivery - no prices, just what moved. */
+export function deliveryNoteHtml(
+  d: {
+    invoiceNumber: string;
+    customerName: string;
+    customerPhone: string;
+    productName: string;
+    qtyDelivered: string;
+    unit: string | null;
+    balancePending: string;
+  },
+  s: BusinessSettings,
+): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Delivery Note</title>
+<style>
+  @page { size: A5; margin: 10mm; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 13px; color: #111; }
+  .biz { font-size: 16px; font-weight: 700; }
+  .title { text-align: center; font-weight: 700; letter-spacing: 1px; margin: 10px 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  td { border: 1px solid #999; padding: 6px 8px; }
+  .lbl { color: #555; width: 40%; }
+</style></head><body>
+<div class="biz">${esc(s.businessName)}</div>
+<div class="title">DELIVERY NOTE</div>
+<table>
+  <tr><td class="lbl">Bill No</td><td>${esc(d.invoiceNumber)}</td></tr>
+  <tr><td class="lbl">Date</td><td>${esc(new Date().toLocaleString("en-IN"))}</td></tr>
+  <tr><td class="lbl">Customer</td><td>${esc(d.customerName)}${d.customerPhone ? " (" + esc(d.customerPhone) + ")" : ""}</td></tr>
+  <tr><td class="lbl">Product</td><td>${esc(d.productName)}</td></tr>
+  <tr><td class="lbl">Quantity Delivered Today</td><td>${esc(d.qtyDelivered)} ${esc(d.unit ?? "")}</td></tr>
+  <tr><td class="lbl">Balance Still Pending</td><td>${esc(d.balancePending)} ${esc(d.unit ?? "")}</td></tr>
+</table>
+<div style="margin-top:40px; display:flex; justify-content:space-between;">
+  <div>Received by: ______________________</div>
+  <div>Delivered by: ______________________</div>
+</div>
 </body></html>`;
 }
 
@@ -247,8 +372,10 @@ export function printHtml(html: string): void {
 }
 
 export function printInvoice(d: InvoiceData, s: BusinessSettings): void {
-  const title = d.sale.gst_applied === 0 ? "INVOICE (NO GST)" : "TAX INVOICE";
-  printHtml(s.printFormat === "THERMAL" ? invoiceHtmlThermal(d, s) : invoiceHtmlA4(d, s, title));
+  const title = d.sale.gst_applied === 0 ? s.estimateTitle || "ESTIMATE" : "TAX INVOICE";
+  printHtml(
+    s.printFormat === "THERMAL" ? invoiceHtmlThermal(d, s, title) : invoiceHtmlA4(d, s, title),
+  );
 }
 
 export { inWords };

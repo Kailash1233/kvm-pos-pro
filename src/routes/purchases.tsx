@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, Plus, Trash2, Undo2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/kvm/PageHeader";
@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApp, useQueryData } from "@/lib/app-context";
-import { rupees, formatQty, toPaise, toQty, toRupees } from "@/lib/money";
+import { rupees, formatQty, fromQty, toPaise, toQty, toRupees } from "@/lib/money";
 import { searchProducts, type ProductWithStock } from "@/lib/services/products";
 import { listSuppliers, type SupplierWithBalance } from "@/lib/services/suppliers";
 import {
@@ -33,6 +33,11 @@ import {
   type Purchase,
 } from "@/lib/services/purchases";
 import type { PaymentMethod } from "@/lib/services/sales";
+import {
+  deliverCreditInvoice,
+  listCreditInvoiceEntries,
+  type CreditInvoiceListRow,
+} from "@/lib/services/creditInvoices";
 
 export const Route = createFileRoute("/purchases")({
   head: () => ({
@@ -54,6 +59,7 @@ function PurchasesPage() {
   const [viewId, setViewId] = useState<number | null>(null);
   const [returnPurchase, setReturnPurchase] = useState<Purchase | null>(null);
   const [search, setSearch] = useState("");
+  const [allocateProductIds, setAllocateProductIds] = useState<number[]>([]);
 
   const rows = useQueryData(
     () => listPurchases({ search: search || undefined, limit: 200 }),
@@ -202,9 +208,10 @@ function PurchasesPage() {
       <NewPurchaseDialog
         open={newOpen}
         onClose={() => setNewOpen(false)}
-        onDone={() => {
+        onDone={(productIds) => {
           refresh();
           setNewOpen(false);
+          setAllocateProductIds(productIds);
         }}
       />
       <PurchaseReturnDialog
@@ -212,7 +219,106 @@ function PurchasesPage() {
         onClose={() => setReturnPurchase(null)}
         onDone={refresh}
       />
+      <AllocateDialog
+        productIds={allocateProductIds}
+        onClose={() => {
+          setAllocateProductIds([]);
+          refresh();
+        }}
+      />
     </div>
+  );
+}
+
+/**
+ * After a purchase, offers to hand the fresh stock straight to customers who
+ * are already owed it (oldest bill first) instead of letting it sit on the
+ * shelf while they're still waiting.
+ */
+function AllocateDialog({ productIds, onClose }: { productIds: number[]; onClose: () => void }) {
+  const { user } = useApp();
+  const [qtyByEntry, setQtyByEntry] = useState<Record<number, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  const entries = useQueryData<CreditInvoiceListRow[]>(() => {
+    if (!productIds.length) return [];
+    return listCreditInvoiceEntries({ status: "OPEN", limit: 300 }).filter((e) =>
+      productIds.includes(e.product_id),
+    );
+  }, [productIds]);
+
+  useEffect(() => {
+    const next: Record<number, string> = {};
+    for (const e of entries ?? []) next[e.id] = String(fromQty(e.billed_qty - e.delivered_qty));
+    setQtyByEntry(next);
+  }, [entries]);
+
+  if (!productIds.length || !entries?.length) return null;
+
+  async function confirm() {
+    if (!user) return;
+    setBusy(true);
+    let okCount = 0;
+    for (const e of entries!) {
+      const qty = Number(qtyByEntry[e.id] || 0);
+      if (!qty || qty <= 0) continue;
+      try {
+        deliverCreditInvoice(e.id, Math.round(qty * 1000), {
+          refType: "PURCHASE",
+          user: user.full_name,
+        });
+        okCount++;
+      } catch (err) {
+        toast.error(
+          `${e.customer_name} — ${e.product_name}: ${err instanceof Error ? err.message : "could not be delivered."}`,
+        );
+      }
+    }
+    if (okCount) toast.success(`Delivered to ${okCount} pending order${okCount === 1 ? "" : "s"}.`);
+    setBusy(false);
+    onClose();
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Allocate to pending deliveries</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          These customers are still owed stock you just purchased - oldest bill first. Allocate as
+          much as you like, full or partial.
+        </p>
+        <div className="max-h-80 space-y-2 overflow-auto">
+          {entries.map((e) => (
+            <div key={e.id} className="flex items-center justify-between gap-3 border-b pb-2">
+              <div className="text-sm">
+                <div className="font-medium">
+                  {e.customer_name} — {e.product_name}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Bill {e.invoice_number} · pending {formatQty(e.billed_qty - e.delivered_qty)}{" "}
+                  {e.unit}
+                </div>
+              </div>
+              <Input
+                className="num h-9 w-24"
+                value={qtyByEntry[e.id] ?? ""}
+                onChange={(ev) => setQtyByEntry((p) => ({ ...p, [e.id]: ev.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Skip for now
+          </Button>
+          <Button disabled={busy} onClick={() => void confirm()}>
+            Confirm allocation
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -230,7 +336,7 @@ function NewPurchaseDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onDone: () => void;
+  onDone: (productIds: number[]) => void;
 }) {
   const { user } = useApp();
   const [supplier, setSupplier] = useState<SupplierWithBalance | null>(null);
@@ -327,8 +433,9 @@ function NewPurchaseDialog({
         user: user.full_name,
       });
       toast.success(`Purchase ${number} saved. Stock updated.`);
+      const productIds = [...new Set(lines.map((l) => l.product.id))];
       reset();
-      onDone();
+      onDone(productIds);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save this purchase.");
     } finally {

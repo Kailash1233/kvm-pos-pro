@@ -8,7 +8,8 @@ export type MovementType =
   | "PURCHASE_RETURN"
   | "SALES_RETURN"
   | "ADJUST_IN"
-  | "ADJUST_OUT";
+  | "ADJUST_OUT"
+  | "CREDIT_DELIVERY";
 
 export interface StockMovement {
   id: number;

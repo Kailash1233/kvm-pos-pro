@@ -58,3 +58,31 @@ export async function goTo(page: Page, key: "F1" | "F2" | "F3" | "F4", urlContai
   await page.keyboard.press(key);
   await page.waitForURL((url) => url.pathname.includes(urlContains), { timeout: 10000 });
 }
+
+/** Client-side nav via the sidebar link text, for routes with no F-key shortcut. */
+export async function goToByLink(page: Page, linkText: string, urlContains: string) {
+  await page.locator(`nav a:has-text("${linkText}")`).click();
+  await page.waitForURL((url) => url.pathname.includes(urlContains), { timeout: 10000 });
+}
+
+/**
+ * printInvoice() builds the bill as HTML in a hidden iframe, appended to the
+ * page and removed again 1.5s later - read its text content right after
+ * triggering print, while it's still there.
+ */
+export async function printedText(page: Page): Promise<string> {
+  await page.waitForSelector("iframe", { state: "attached", timeout: 5000 });
+  await page.waitForFunction(
+    () => {
+      const frames = Array.from(document.querySelectorAll("iframe"));
+      const frame = frames[frames.length - 1] as HTMLIFrameElement | undefined;
+      return !!frame?.contentDocument?.body?.innerText;
+    },
+    { timeout: 5000 },
+  );
+  return page.evaluate(() => {
+    const frames = Array.from(document.querySelectorAll("iframe"));
+    const frame = frames[frames.length - 1] as HTMLIFrameElement | undefined;
+    return frame?.contentDocument?.body?.innerText ?? "";
+  });
+}

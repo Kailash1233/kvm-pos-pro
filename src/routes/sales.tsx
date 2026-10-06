@@ -27,6 +27,7 @@ import {
   type Sale,
 } from "@/lib/services/sales";
 import { getCustomer } from "@/lib/services/customers";
+import { pendingDeliveriesForSale } from "@/lib/services/creditInvoices";
 import { printInvoice } from "@/lib/services/print";
 
 export const Route = createFileRoute("/sales")({
@@ -103,6 +104,7 @@ function SalesPage() {
         payments: found.payments,
         customer,
         outstanding: customer?.outstanding,
+        pendingDeliveries: pendingDeliveriesForSale(saleId),
       },
       settings,
     );
@@ -200,7 +202,7 @@ function SalesPage() {
                       <tr key={s.id} className="border-t border-border">
                         <td className="px-4 py-2 font-medium">{s.invoice_number}</td>
                         <td className="px-2 py-2 text-muted-foreground">{s.sale_date}</td>
-                        <td className="px-2 py-2">{s.customer_name}</td>
+                        <td className="px-2 py-2">{s.customer_name || "Walk-in"}</td>
                         <td className="px-2 py-2 text-muted-foreground">{s.created_by}</td>
                         <td className="px-2 py-2">
                           {s.status === "CANCELLED" ? (
@@ -286,7 +288,7 @@ function SalesPage() {
                         <td className="px-4 py-2 font-medium">{r.return_number}</td>
                         <td className="px-2 py-2 text-muted-foreground">{r.return_date}</td>
                         <td className="px-2 py-2">{r.invoice_number}</td>
-                        <td className="px-2 py-2">{r.customer_name}</td>
+                        <td className="px-2 py-2">{r.customer_name || "Walk-in"}</td>
                         <td className="px-2 py-2 text-muted-foreground">{r.reason ?? "-"}</td>
                         <td className="num px-4 py-2">{rupees(r.total)}</td>
                       </tr>

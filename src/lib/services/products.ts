@@ -9,6 +9,9 @@ import {
   transaction,
 } from "../db/database";
 import { logAudit } from "./audit";
+import { getSettings } from "./settings";
+
+export type PricingType = "UNIT" | "KG";
 
 export interface Product {
   id: number;
@@ -28,6 +31,8 @@ export interface Product {
   min_stock: number;
   /** A compact data: URL (JPEG, resized client-side) or null if no photo was added. */
   image: string | null;
+  /** "KG" bills this product by weight (Weight x Rate/kg) instead of Qty x Rate. */
+  pricing_type: PricingType;
   active: number;
   created_at: string;
   updated_at: string;
@@ -183,6 +188,7 @@ export interface ProductInput {
   contractor_price?: number;
   min_stock?: number;
   image?: string | null;
+  pricing_type?: PricingType;
 }
 
 export function createProduct(
@@ -202,8 +208,8 @@ export function createProduct(
     const id = insert(
       `INSERT INTO products(product_number, barcode, name, category, subcategory, brand, unit, hsn,
         gst_rate, purchase_price, retail_price, dealer_price, contractor_price, min_stock, image,
-        active, created_at, updated_at)
-       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+        pricing_type, active, created_at, updated_at)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
       [
         num,
         input.barcode?.trim() || null,
@@ -220,6 +226,7 @@ export function createProduct(
         input.contractor_price ?? 0,
         input.min_stock ?? 0,
         input.image || null,
+        input.pricing_type ?? "UNIT",
         ts,
         ts,
       ],
@@ -257,7 +264,7 @@ export function updateProduct(id: number, input: ProductInput, actor: string): v
     run(
       `UPDATE products SET product_number=?, barcode=?, name=?, category=?, subcategory=?, brand=?,
          unit=?, hsn=?, gst_rate=?, purchase_price=?, retail_price=?, dealer_price=?,
-         contractor_price=?, min_stock=?, image=?, updated_at=? WHERE id=?`,
+         contractor_price=?, min_stock=?, image=?, pricing_type=?, updated_at=? WHERE id=?`,
       [
         num,
         input.barcode?.trim() || null,
@@ -274,6 +281,7 @@ export function updateProduct(id: number, input: ProductInput, actor: string): v
         input.contractor_price ?? 0,
         input.min_stock ?? 0,
         input.image !== undefined ? input.image : before.image,
+        input.pricing_type ?? before.pricing_type,
         nowIso(),
         id,
       ],
@@ -411,7 +419,38 @@ export function listBrands(): string[] {
   return all<{ name: string }>("SELECT name FROM brands ORDER BY name").map((r) => r.name);
 }
 
+const DEFAULT_UNITS = [
+  "Bags",
+  "Kg",
+  "Nos",
+  "Pieces",
+  "Tonnes",
+  "Bundles",
+  "Feet",
+  "Metres",
+  "Sq.ft",
+  "Litres",
+  "Boxes",
+  "Loads",
+];
+
+/**
+ * Every unit a product can be assigned: the built-in list, whatever a shop
+ * added in Settings, and anything already saved on a product - merged and
+ * deduped so there is one source of truth for every caller.
+ */
 export function listUnits(): string[] {
-  const rows = all<{ name: string }>("SELECT name FROM units ORDER BY name").map((r) => r.name);
-  return rows.length ? rows : ["Bag", "Piece", "Kg", "Ton", "Metre", "Litre", "Box", "Number"];
+  const fromLookup = all<{ name: string }>("SELECT name FROM units ORDER BY name").map(
+    (r) => r.name,
+  );
+  const custom = getSettings().customUnits ?? [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const u of [...DEFAULT_UNITS, ...custom, ...fromLookup]) {
+    const key = u.trim();
+    if (!key || seen.has(key.toLowerCase())) continue;
+    seen.add(key.toLowerCase());
+    out.push(key);
+  }
+  return out;
 }

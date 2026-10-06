@@ -200,6 +200,7 @@ const EMPTY_FORM = {
   min_stock: "",
   opening_stock: "",
   image: null as string | null,
+  pricing_type: "UNIT" as "UNIT" | "KG",
 };
 
 function ProductFormDialog({
@@ -239,6 +240,7 @@ function ProductFormDialog({
         min_stock: value.min_stock ? String(fromQty(value.min_stock)) : "",
         opening_stock: "",
         image: value.image,
+        pricing_type: value.pricing_type ?? "UNIT",
       });
       setAdvanced(false);
     }
@@ -287,6 +289,7 @@ function ProductFormDialog({
       contractor_price: toPaise(form.contractor_price || 0),
       min_stock: toQty(form.min_stock || 0),
       image: form.image,
+      pricing_type: form.pricing_type,
     };
     setBusy(true);
     try {
@@ -384,6 +387,23 @@ function ProductFormDialog({
                       {u}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                Billed By
+              </Label>
+              <Select
+                value={form.pricing_type}
+                onValueChange={(v) => setForm({ ...form, pricing_type: v as "UNIT" | "KG" })}
+              >
+                <SelectTrigger className="mt-1.5">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UNIT">Per Unit (Qty x Rate)</SelectItem>
+                  <SelectItem value="KG">Per Kg (Weight x Rate/kg)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

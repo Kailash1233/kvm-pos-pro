@@ -15,6 +15,7 @@ import {
   LogOut,
   ShieldCheck,
   Keyboard,
+  PackageCheck,
 } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import type { Permission } from "@/lib/services/auth";
@@ -32,6 +33,13 @@ const NAV = [
   { to: "/stock", label: "Stock", icon: Boxes, key: "F4" },
   { to: "/purchases", label: "Purchases", icon: Truck, key: "", perm: "purchase.manage" },
   { to: "/customers", label: "Customers", icon: Users, key: "" },
+  {
+    to: "/credit-invoices",
+    label: "Credit Invoices",
+    icon: PackageCheck,
+    key: "",
+    perm: "customer.manage",
+  },
   { to: "/suppliers", label: "Suppliers", icon: Warehouse, key: "", perm: "supplier.manage" },
   { to: "/reports", label: "Reports", icon: BarChart3, key: "", perm: "reports.view" },
   { to: "/gst", label: "GST", icon: Percent, key: "", perm: "gst.manage" },

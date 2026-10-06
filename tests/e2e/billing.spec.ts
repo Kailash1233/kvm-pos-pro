@@ -21,6 +21,11 @@ test("bills with GST, auto-fills credit, and saves correctly", async ({ page }) 
   await expect(page.locator("text=Test Widget")).toBeVisible();
 
   await goTo(page, "F2", "/billing");
+  // GST is off by default now - turn it on for this bill.
+  await expect(page.locator("#gst-toggle")).toHaveAttribute("aria-checked", "false");
+  await page.locator("#gst-toggle").click();
+  await expect(page.locator("#gst-toggle")).toHaveAttribute("aria-checked", "true");
+
   await page.locator('input[placeholder="Number, barcode or name"]').fill("Test Widget");
   await page.waitForTimeout(300);
   await page.keyboard.press("Enter");
