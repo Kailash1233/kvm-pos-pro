@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("kvmDesktop", {
   listBackups: () => ipcRenderer.invoke("kvm:listBackups"),
   readBackup: (name) => ipcRenderer.invoke("kvm:readBackup", name),
   openBackupFolder: () => ipcRenderer.invoke("kvm:openBackupFolder"),
+  openExportsFolder: () => ipcRenderer.invoke("kvm:openExportsFolder"),
   dbPath: () => ipcRenderer.invoke("kvm:dbPath"),
   saveFile: (name, bytes) => ipcRenderer.invoke("kvm:saveFile", name, bytes),
 });

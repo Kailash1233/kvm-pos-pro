@@ -209,7 +209,11 @@ export function ImportProductsDialog({
             <Button
               variant="outline"
               onClick={() =>
-                void downloadTemplate().catch(() => toast.error("Could not create the template."))
+                void downloadTemplate()
+                  .then((result) => {
+                    if (result) toast.success(`Exported: ${result}`);
+                  })
+                  .catch(() => toast.error("Could not create the template."))
               }
             >
               <Download className="mr-1.5 h-4 w-4" /> Download sample template (.xlsx)

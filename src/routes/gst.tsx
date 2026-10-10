@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { FileDown } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/kvm/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,13 +88,16 @@ function GstPage() {
 }
 
 function ExportBtn({ rows, name }: { rows: Record<string, unknown>[]; name: string }) {
+  async function doExport() {
+    try {
+      const result = await exportCsv(`${name}.csv`, rows);
+      if (result) toast.success(`Exported: ${result}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not export this report.");
+    }
+  }
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={() => void exportCsv(`${name}.csv`, rows)}
-      disabled={!rows.length}
-    >
+    <Button size="sm" variant="outline" onClick={() => void doExport()} disabled={!rows.length}>
       <FileDown className="mr-1.5 h-3.5 w-3.5" /> Export CSV
     </Button>
   );

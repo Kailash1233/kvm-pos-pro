@@ -2,7 +2,9 @@ import * as XLSX from "xlsx";
 import { all, one, transaction } from "../db/database";
 import { toPaise, toQty, toRupees, fromQty } from "../money";
 import { createProduct, ensureLookup, type ProductInput } from "./products";
-import { saveExportFile } from "../db/storage";
+import { saveExportFile, openExportsFolder } from "../db/storage";
+
+export { openExportsFolder };
 import { fetchImageAsDataUrl } from "../image";
 
 export const TEMPLATE_COLUMNS = [

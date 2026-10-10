@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { FileDown } from "lucide-react";
+import { toast } from "sonner";
 import {
   Bar,
   BarChart,
@@ -168,16 +169,21 @@ function isNumericCell(v: Cell): boolean {
 }
 
 function ExportBtn({ rows, name }: { rows: Record<string, Cell>[]; name: string }) {
-  function doExport() {
-    const exportRows = rows.map((r) => {
-      const out: Record<string, string | number> = {};
-      for (const [k, v] of Object.entries(r)) out[k] = exportCell(v);
-      return out;
-    });
-    void exportCsv(`${name}.csv`, exportRows);
+  async function doExport() {
+    try {
+      const exportRows = rows.map((r) => {
+        const out: Record<string, string | number> = {};
+        for (const [k, v] of Object.entries(r)) out[k] = exportCell(v);
+        return out;
+      });
+      const result = await exportCsv(`${name}.csv`, exportRows);
+      if (result) toast.success(`Exported: ${result}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not export this report.");
+    }
   }
   return (
-    <Button size="sm" variant="outline" onClick={doExport} disabled={!rows.length}>
+    <Button size="sm" variant="outline" onClick={() => void doExport()} disabled={!rows.length}>
       <FileDown className="mr-1.5 h-3.5 w-3.5" /> Export CSV
     </Button>
   );

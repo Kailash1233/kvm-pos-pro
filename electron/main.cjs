@@ -120,6 +120,10 @@ ipcMain.handle("kvm:openBackupFolder", async () => {
   await shell.openPath(DIRS.backups);
 });
 
+ipcMain.handle("kvm:openExportsFolder", async () => {
+  await shell.openPath(DIRS.exports);
+});
+
 ipcMain.handle("kvm:dbPath", async () => DB_FILE);
 
 ipcMain.handle("kvm:saveFile", async (_evt, name, bytes) => {

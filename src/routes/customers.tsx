@@ -482,6 +482,15 @@ function CustomerProfileDialog({
     }));
   }
 
+  async function doExportStatement() {
+    try {
+      const result = await exportCsv(`${customer!.name}-statement.csv`, statementRows());
+      if (result) toast.success(`Exported: ${result}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not export this statement.");
+    }
+  }
+
   function printStatement() {
     const rows = statementRows();
     let running = customer!.opening_balance;
@@ -543,11 +552,7 @@ function CustomerProfileDialog({
                 <Button size="sm" variant="outline" onClick={printStatement}>
                   <Printer className="mr-1.5 h-3.5 w-3.5" /> Print
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void exportCsv(`${customer.name}-statement.csv`, statementRows())}
-                >
+                <Button size="sm" variant="outline" onClick={() => void doExportStatement()}>
                   <FileDown className="mr-1.5 h-3.5 w-3.5" /> Export CSV
                 </Button>
               </div>

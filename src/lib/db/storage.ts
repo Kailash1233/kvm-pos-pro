@@ -16,6 +16,7 @@ export interface DesktopBridge {
   listBackups(): Promise<{ name: string; size: number; created: string }[]>;
   readBackup(name: string): Promise<Uint8Array | null>;
   openBackupFolder(): Promise<void>;
+  openExportsFolder(): Promise<void>;
   dbPath(): Promise<string>;
   saveFile(name: string, bytes: Uint8Array): Promise<string>;
 }
@@ -126,6 +127,13 @@ export async function openBackupFolder(): Promise<boolean> {
   const b = bridge();
   if (!b) return false;
   await b.openBackupFolder();
+  return true;
+}
+
+export async function openExportsFolder(): Promise<boolean> {
+  const b = bridge();
+  if (!b) return false;
+  await b.openExportsFolder();
   return true;
 }
 

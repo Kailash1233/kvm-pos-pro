@@ -32,6 +32,7 @@ import {
   databaseLocation,
   openBackupFolder,
 } from "@/lib/services/backup";
+import { openExportsFolder } from "@/lib/services/excel";
 import {
   listUsers,
   createUser,
@@ -115,6 +116,12 @@ function Settings() {
   async function doOpenBackupFolder() {
     const opened = await openBackupFolder();
     if (!opened) toast.info("The backup folder can only be opened from the installed desktop app.");
+  }
+
+  async function doOpenExportsFolder() {
+    const opened = await openExportsFolder();
+    if (!opened)
+      toast.info("The exports folder can only be opened from the installed desktop app.");
   }
 
   async function doRestore(name: string) {
@@ -391,6 +398,9 @@ function Settings() {
             <div className="flex flex-wrap items-center gap-2 md:justify-end">
               <Button variant="outline" size="sm" onClick={() => void doOpenBackupFolder()}>
                 <FolderOpen className="mr-1.5 h-3.5 w-3.5" /> Open backup folder
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void doOpenExportsFolder()}>
+                <FolderOpen className="mr-1.5 h-3.5 w-3.5" /> Open exports folder
               </Button>
               <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
                 <Upload className="mr-1.5 h-3.5 w-3.5" /> Restore from file
