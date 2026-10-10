@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -348,6 +349,7 @@ function NewPurchaseDialog({
   const [paid, setPaid] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [notes, setNotes] = useState("");
+  const [gstApplied, setGstApplied] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const supplierMatches = useMemo(() => {
@@ -376,11 +378,11 @@ function NewPurchaseDialog({
       const amount = Math.round((l.price * l.qty) / 1000);
       const t = Math.max(amount - l.discount, 0);
       taxable += t;
-      tax += Math.round((t * l.product.gst_rate) / 100);
+      if (gstApplied) tax += Math.round((t * l.product.gst_rate) / 100);
       subtotal += amount;
     }
     return { subtotal, taxable, tax, total: taxable + tax };
-  }, [lines]);
+  }, [lines, gstApplied]);
 
   function addProduct(p: ProductWithStock) {
     setLines((prev) => {
@@ -403,6 +405,30 @@ function NewPurchaseDialog({
     setPaid("");
     setNotes("");
     setTerm("");
+    setGstApplied(true);
+    setLineDrafts({});
+  }
+
+  // Qty/Price are controlled from the authoritative fixed-point number,
+  // which rounds on every keystroke - without this, typing a decimal
+  // character by character (e.g. "1.5") gets its "." rounded away after
+  // the first keystroke and the field keeps growing. Show exactly what
+  // was typed while the cell is focused instead.
+  const [lineDrafts, setLineDrafts] = useState<Record<string, string>>({});
+  function lineValue(key: string, derived: string) {
+    return lineDrafts[key] ?? derived;
+  }
+  function onLineChange(key: string, raw: string, commit: (v: string) => void) {
+    setLineDrafts((d) => ({ ...d, [key]: raw }));
+    commit(raw);
+  }
+  function onLineBlur(key: string) {
+    setLineDrafts((d) => {
+      if (!(key in d)) return d;
+      const next = { ...d };
+      delete next[key];
+      return next;
+    });
   }
 
   function submit() {
@@ -431,6 +457,7 @@ function NewPurchaseDialog({
         paymentMethod: method,
         notes,
         user: user.full_name,
+        gstApplied,
       });
       toast.success(`Purchase ${number} saved. Stock updated.`);
       const productIds = [...new Set(lines.map((l) => l.product.id))];
@@ -541,6 +568,16 @@ function NewPurchaseDialog({
             ) : null}
           </div>
 
+          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+            <div>
+              <div className="text-sm font-medium">Charge GST on this purchase</div>
+              <p className="text-xs text-muted-foreground">
+                Turn off if the supplier's invoice has no GST on it.
+              </p>
+            </div>
+            <Switch checked={gstApplied} onCheckedChange={setGstApplied} />
+          </div>
+
           <div className="panel overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-secondary text-xs uppercase text-muted-foreground">
@@ -563,39 +600,44 @@ function NewPurchaseDialog({
                 ) : (
                   lines.map((l, i) => {
                     const amount = Math.round((l.price * l.qty) / 1000) - l.discount;
-                    const total = amount + Math.round((amount * l.product.gst_rate) / 100);
+                    const effectiveRate = gstApplied ? l.product.gst_rate : 0;
+                    const total = amount + Math.round((amount * effectiveRate) / 100);
                     return (
                       <tr key={l.product.id} className="border-t border-border">
                         <td className="px-3 py-1.5">{l.product.name}</td>
                         <td className="px-2 py-1.5">
                           <Input
                             className="num h-8 w-20 ml-auto"
-                            value={formatQty(l.qty)}
+                            value={lineValue(`qty-${i}`, formatQty(l.qty))}
                             onChange={(e) =>
-                              setLines((prev) =>
-                                prev.map((x, idx) =>
-                                  idx === i ? { ...x, qty: toQty(e.target.value) } : x,
+                              onLineChange(`qty-${i}`, e.target.value, (v) =>
+                                setLines((prev) =>
+                                  prev.map((x, idx) => (idx === i ? { ...x, qty: toQty(v) } : x)),
                                 ),
                               )
                             }
+                            onFocus={(e) => e.target.select()}
+                            onBlur={() => onLineBlur(`qty-${i}`)}
                           />
                         </td>
                         <td className="px-2 py-1.5">
                           <Input
                             className="num h-8 w-24 ml-auto"
-                            value={toRupees(l.price)}
+                            value={lineValue(`price-${i}`, toRupees(l.price).toString())}
                             onChange={(e) =>
-                              setLines((prev) =>
-                                prev.map((x, idx) =>
-                                  idx === i ? { ...x, price: toPaise(e.target.value) } : x,
+                              onLineChange(`price-${i}`, e.target.value, (v) =>
+                                setLines((prev) =>
+                                  prev.map((x, idx) =>
+                                    idx === i ? { ...x, price: toPaise(v) } : x,
+                                  ),
                                 ),
                               )
                             }
+                            onFocus={(e) => e.target.select()}
+                            onBlur={() => onLineBlur(`price-${i}`)}
                           />
                         </td>
-                        <td className="num px-2 py-1.5 text-muted-foreground">
-                          {l.product.gst_rate}%
-                        </td>
+                        <td className="num px-2 py-1.5 text-muted-foreground">{effectiveRate}%</td>
                         <td className="num px-2 py-1.5">{rupees(total)}</td>
                         <td className="px-3 py-1.5 text-right">
                           <Button

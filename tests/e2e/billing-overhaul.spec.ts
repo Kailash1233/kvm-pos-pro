@@ -144,7 +144,7 @@ test("GST on with a selected customer prints a full tax invoice", async ({ page 
   expect(printed).toContain("Lakshmi Traders");
 });
 
-test("a kg-priced product bills by weight and transport charges add to the total after GST", async ({
+test("a product billed in Kg accepts a decimal quantity, and the printed bill shows no item code", async ({
   page,
 }) => {
   await completeSetup(page);
@@ -154,8 +154,9 @@ test("a kg-priced product bills by weight and transport charges add to the total
   await page.waitForSelector("text=/^Add Product$/");
   await byLabel(page, "Product Name").fill("TMT Steel Rod");
   await page.locator('button:has-text("Suggest")').click();
-  await page.locator('div[role="dialog"] button:has-text("Per Unit (Qty x Rate)")').click();
-  await page.locator('[role="option"]:has-text("Per Kg (Weight x Rate/kg)")').click();
+  // Unit is just the product's own generic Unit field - no "Per Kg" mode.
+  await page.locator('div[role="dialog"] button:has-text("Bags")').click();
+  await page.locator('[role="option"]:has-text("Kg")').first().click();
   await byLabel(page, "Purchase Price").fill("50");
   await byLabel(page, "Selling Price").fill("68");
   await byLabel(page, "Opening Stock").fill("500");
@@ -167,7 +168,7 @@ test("a kg-priced product bills by weight and transport charges add to the total
   await page.waitForTimeout(300);
   await page.keyboard.press("Enter");
 
-  // Weight field (same underlying id as "qty"), decimals allowed.
+  // Decimal quantity, typed character by character - must not snap back.
   await expect(page.locator("#cart-qty-0")).toBeFocused();
   await page.keyboard.type("1.5");
   await page.keyboard.press("Enter");
@@ -186,8 +187,12 @@ test("a kg-priced product bills by weight and transport charges add to the total
   await expect(page.locator("text=/saved/i")).toBeVisible({ timeout: 10000 });
 
   const printed = await printedText(page);
-  expect(printed).toMatch(/1\.500\s*kg/);
-  expect(printed).toContain("68.00/kg");
+  expect(printed).toContain("1.5 Kg");
+  expect(printed).not.toContain("/kg");
+  expect(printed).not.toContain("kg @");
   expect(printed).toContain("Transport Charges (Vandi Vadagai)");
   expect(printed).toContain("402.00");
+  // No item/product code shown anywhere on the printed bill.
+  const prodLine = printed.split("\n").find((l) => l.includes("TMT Steel Rod"));
+  expect(prodLine).toMatch(/^\d+\s+TMT Steel Rod\s+1\.5 Kg/);
 });

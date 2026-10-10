@@ -60,6 +60,7 @@ test("billing beyond stock creates a Partially Delivered Credit Invoice entry", 
   await expect(row).toContainText("Partially Delivered");
 
   await goTo(page, "F1", "/");
+  await page.click('button[title="Show numbers"]'); // dashboard figures are masked by default
   await expect(page.locator("text=Pending deliveries").locator("..")).toContainText("1");
 });
 
@@ -109,6 +110,7 @@ test("a purchase can allocate fresh stock to a customer still owed from an earli
   await expect(row).toContainText("DELIVERED");
 
   await goTo(page, "F1", "/");
+  await page.click('button[title="Show numbers"]'); // dashboard figures are masked by default
   await expect(page.locator("text=Pending deliveries").locator("..")).toContainText("0");
 });
 

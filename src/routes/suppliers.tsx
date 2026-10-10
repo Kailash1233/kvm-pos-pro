@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { useApp, useQueryData } from "@/lib/app-context";
 import { rupees, toPaise } from "@/lib/money";
+import { MoneyInput } from "@/components/kvm/MoneyInput";
 import {
   listSuppliers,
   getSupplier,
@@ -247,10 +248,10 @@ function SupplierFormDialog({
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
               Opening Balance
             </Label>
-            <Input
+            <MoneyInput
               className="num mt-1.5"
-              value={form.opening_balance || ""}
-              onChange={(e) => setForm({ ...form, opening_balance: toPaise(e.target.value) })}
+              valuePaise={form.opening_balance}
+              onChange={(paise) => setForm({ ...form, opening_balance: paise })}
             />
           </div>
         </div>

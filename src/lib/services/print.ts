@@ -114,10 +114,10 @@ export function invoiceHtmlA4(d: InvoiceData, s: BusinessSettings, title = "TAX 
     .map(
       (it, i) => `<tr>
       <td class="c">${i + 1}</td>
-      <td>${esc(it.product_name)}<div class="sub">${esc(it.product_number)}</div></td>
+      <td>${esc(it.product_name)}</td>
       ${gstOn ? `<td class="c">${esc(it.hsn ?? "")}</td>` : ""}
-      <td class="n">${it.pricing_type === "KG" ? `${(it.qty / 1000).toFixed(3)} kg` : `${formatQty(it.qty)} ${esc(it.unit ?? "")}`}</td>
-      <td class="n">${toRupees(it.price).toFixed(2)}${it.pricing_type === "KG" ? "/kg" : ""}</td>
+      <td class="n">${formatQty(it.qty)} ${esc(it.unit ?? "")}</td>
+      <td class="n">${toRupees(it.price).toFixed(2)}</td>
       <td class="n">${it.discount ? toRupees(it.discount).toFixed(2) : "-"}</td>
       <td class="n">${toRupees(it.taxable).toFixed(2)}</td>
       ${gstOn ? `<td class="c">${it.gst_rate}%</td><td class="n">${toRupees(it.cgst + it.sgst + it.igst).toFixed(2)}</td>` : ""}
@@ -251,10 +251,7 @@ export function invoiceHtmlThermal(
   const gstOn = sale.gst_applied !== 0;
   const rows = items
     .map((it) => {
-      const qtyRate =
-        it.pricing_type === "KG"
-          ? `${(it.qty / 1000).toFixed(3)} kg @ ${toRupees(it.price).toFixed(2)}/kg`
-          : `${formatQty(it.qty)} x ${toRupees(it.price).toFixed(2)}`;
+      const qtyRate = `${formatQty(it.qty)} ${esc(it.unit ?? "")} x ${toRupees(it.price).toFixed(2)}`;
       return `<tr><td colspan="3">${esc(it.product_name)}</td></tr>
       <tr><td>${qtyRate}</td>${gstOn ? `<td class="c">${it.gst_rate}%</td>` : "<td></td>"}<td class="n">${toRupees(it.total).toFixed(2)}</td></tr>`;
     })

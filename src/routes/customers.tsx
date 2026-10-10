@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { useApp, useQueryData } from "@/lib/app-context";
 import { rupees, toPaise } from "@/lib/money";
+import { MoneyInput } from "@/components/kvm/MoneyInput";
 import {
   listCustomers,
   getCustomer,
@@ -302,20 +303,20 @@ function CustomerFormDialog({
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                 Credit Limit
               </Label>
-              <Input
+              <MoneyInput
                 className="num mt-1.5"
-                value={form.credit_limit || ""}
-                onChange={(e) => setForm({ ...form, credit_limit: toPaise(e.target.value) })}
+                valuePaise={form.credit_limit}
+                onChange={(paise) => setForm({ ...form, credit_limit: paise })}
               />
             </div>
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                 Opening Balance
               </Label>
-              <Input
+              <MoneyInput
                 className="num mt-1.5"
-                value={form.opening_balance || ""}
-                onChange={(e) => setForm({ ...form, opening_balance: toPaise(e.target.value) })}
+                valuePaise={form.opening_balance}
+                onChange={(paise) => setForm({ ...form, opening_balance: paise })}
               />
             </div>
           </div>

@@ -56,6 +56,8 @@ export interface SavePurchaseInput {
   notes?: string;
   user: string;
   updateCostPrice?: boolean;
+  /** false when the supplier's invoice has no GST on it - every line is taxed at 0%. */
+  gstApplied?: boolean;
 }
 
 export function savePurchase(input: SavePurchaseInput): { id: number; number: string } {
@@ -82,12 +84,13 @@ export function savePurchase(input: SavePurchaseInput): { id: number; number: st
     return p;
   });
 
+  const gstApplied = input.gstApplied !== false;
   const { totals, lines } = computeBill(
     input.lines.map((l, i) => ({
       qty: l.qty,
       price: l.price,
       discount: l.discount,
-      gstRate: products[i]!.gst_rate,
+      gstRate: gstApplied ? products[i]!.gst_rate : 0,
     })),
     { interstate: !!input.interstate, roundOff: settings.roundOff },
   );
@@ -140,7 +143,7 @@ export function savePurchase(input: SavePurchaseInput): { id: number; number: st
           l.qty,
           l.price,
           t.discount,
-          p.gst_rate,
+          gstApplied ? p.gst_rate : 0,
           t.taxable,
           t.cgst,
           t.sgst,

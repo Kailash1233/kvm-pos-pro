@@ -75,11 +75,9 @@ export const Route = createFileRoute("/billing")({
 
 interface CartLine {
   product: ProductWithStock;
-  qty: number; // milli-units - weight-in-kg for a "KG" priced product, otherwise a unit count
-  price: number; // paise - rate per kg for a "KG" priced product
+  qty: number; // milli-units - decimals allowed for any unit
+  price: number; // paise
   discount: number; // paise
-  /** Informational only for "KG" products - never affects the amount. */
-  pieces: number | null;
 }
 
 /**
@@ -229,7 +227,6 @@ function Billing() {
             qty,
             price: priceForCustomerType(p, (customer?.type as never) ?? "Retail"),
             discount: 0,
-            pieces: null,
           },
         ];
       });
@@ -337,6 +334,49 @@ function Billing() {
     searchRef.current?.focus();
   }
 
+  /**
+   * The one thing standing between this bill and a save, computed live so
+   * it can be shown as soon as it's true - not just after the cashier
+   * tries to save and gets turned away.
+   */
+  const blockingIssue = useMemo(() => {
+    if (!cart.length || !user) return null;
+    const limit = maxDiscountPercent(user.role);
+    const discountPct = calc.totals.subtotal
+      ? (calc.totals.discount / calc.totals.subtotal) * 100
+      : 0;
+    if (discountPct > limit) {
+      return `Your role allows a maximum discount of ${limit}%. Please ask a manager to approve more.`;
+    }
+    const entered = (Object.keys(payments) as PaymentMethod[])
+      .map((m) => ({ method: m, amount: toPaise(payments[m] || 0) }))
+      .filter((p) => p.amount > 0);
+    const sum = entered.reduce((s, p) => s + p.amount, 0);
+    if (entered.length && sum !== total) {
+      return `Payments add up to ${rupees(sum)} but the bill is ${rupees(total)}. Please correct the amounts.`;
+    }
+    if (entered.some((p) => p.method === "CREDIT") && !customer) {
+      return "Credit bills need a customer. Please choose the customer first.";
+    }
+    const hasPendingLine = cart.some((l) => l.qty - freeStock(l.product.id, l.product.stock) > 0);
+    const resolvedPhoneOk = customer ? !!customer.phone : !!customerPhone.trim();
+    const resolvedNameOk = customer ? !!customer.name : !!customerTerm.trim();
+    if (hasPendingLine && (!resolvedNameOk || !resolvedPhoneOk)) {
+      return "Some items here go to a Credit Invoice for the missing stock - please enter the customer's name and phone number first.";
+    }
+    return null;
+  }, [
+    cart,
+    payments,
+    total,
+    calc.totals.subtotal,
+    calc.totals.discount,
+    user,
+    customer,
+    customerPhone,
+    customerTerm,
+  ]);
+
   const save = useCallback(
     async (print: boolean) => {
       if (!user) return;
@@ -344,41 +384,11 @@ function Billing() {
         toast.error("Add at least one product before saving.");
         return;
       }
-      const limit = maxDiscountPercent(user.role);
-      const discountPct = calc.totals.subtotal
-        ? (calc.totals.discount / calc.totals.subtotal) * 100
-        : 0;
-      if (discountPct > limit) {
-        toast.error(
-          `Your role allows a maximum discount of ${limit}%. Please ask a manager to approve more.`,
-        );
-        return;
-      }
+      if (blockingIssue) return;
       const list = (Object.keys(payments) as PaymentMethod[])
         .map((m) => ({ method: m, amount: toPaise(payments[m] || 0) }))
         .filter((p) => p.amount > 0);
       if (!list.length) list.push({ method: "CASH", amount: total });
-      const sum = list.reduce((s, p) => s + p.amount, 0);
-      if (sum !== total) {
-        toast.error(
-          `Payments add up to ${rupees(sum)} but the bill is ${rupees(total)}. Please correct the amounts.`,
-        );
-        return;
-      }
-      if (list.some((p) => p.method === "CREDIT") && !customer) {
-        toast.error("Credit bills need a customer. Please choose the customer first.");
-        return;
-      }
-      const hasPendingLine = cart.some((l) => l.qty - freeStock(l.product.id, l.product.stock) > 0);
-      const resolvedPhoneOk = customer ? !!customer.phone : !!customerPhone.trim();
-      const resolvedNameOk = customer ? !!customer.name : !!customerTerm.trim();
-      if (hasPendingLine && (!resolvedNameOk || !resolvedPhoneOk)) {
-        toast.error(
-          "Some items here go to a Credit Invoice for the missing stock - please enter the customer's name and phone number first.",
-        );
-        customerRef.current?.focus();
-        return;
-      }
       setBusy(true);
       try {
         const { saleId, invoiceNumber } = saveBill({
@@ -391,7 +401,6 @@ function Billing() {
             qty: l.qty,
             price: l.price,
             discount: l.discount,
-            pieces: l.pieces,
           })),
           payments: list,
           notes,
@@ -445,6 +454,7 @@ function Billing() {
       calc,
       refresh,
       gstApplied,
+      blockingIssue,
     ],
   );
 
@@ -504,7 +514,6 @@ function Billing() {
           qty: l.qty,
           price: l.price,
           discount: l.discount,
-          pieces: l.pieces,
         })),
       },
       user.full_name,
@@ -524,25 +533,12 @@ function Billing() {
         transportCharge?: string;
         notes: string;
         gstApplied?: boolean;
-        lines: {
-          productId: number;
-          qty: number;
-          price: number;
-          discount: number;
-          pieces?: number | null;
-        }[];
+        lines: { productId: number; qty: number; price: number; discount: number }[];
       };
       const lines: CartLine[] = [];
       for (const l of data.lines) {
         const p = searchProducts("", { limit: 1000 }).find((x) => x.id === l.productId);
-        if (p)
-          lines.push({
-            product: p,
-            qty: l.qty,
-            price: l.price,
-            discount: l.discount,
-            pieces: l.pieces ?? null,
-          });
+        if (p) lines.push({ product: p, qty: l.qty, price: l.price, discount: l.discount });
       }
       setCart(lines);
       setCustomer(data.customerId ? getCustomer(data.customerId) : null);
@@ -788,7 +784,6 @@ function Billing() {
                 ) : (
                   cart.map((l, i) => {
                     const line = calc.lines[i]!;
-                    const isKg = l.product.pricing_type === "KG";
                     const free = freeStock(l.product.id, l.product.stock);
                     const shortfallQty = l.qty - free;
                     const over = shortfallQty > 0;
@@ -823,22 +818,8 @@ function Billing() {
                               onFocus={(e) => e.target.select()}
                               onBlur={() => onCellBlur(`qty-${i}`)}
                             />
-                            {isKg ? (
-                              <span className="text-xs text-muted-foreground">kg</span>
-                            ) : null}
+                            <span className="text-xs text-muted-foreground">{l.product.unit}</span>
                           </div>
-                          {isKg ? (
-                            <Input
-                              className="num mt-1 h-7 w-24 text-xs"
-                              placeholder="No. of pieces"
-                              value={l.pieces != null ? String(l.pieces) : ""}
-                              onChange={(e) =>
-                                updateLine(i, {
-                                  pieces: e.target.value ? Number(e.target.value) : null,
-                                })
-                              }
-                            />
-                          ) : null}
                         </td>
                         <td className="px-2 py-2 text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -855,9 +836,6 @@ function Billing() {
                               onFocus={(e) => e.target.select()}
                               onBlur={() => onCellBlur(`rate-${i}`)}
                             />
-                            {isKg ? (
-                              <span className="text-xs text-muted-foreground">/kg</span>
-                            ) : null}
                           </div>
                         </td>
                         <td className="px-2 py-2 text-right">
@@ -1001,6 +979,11 @@ function Billing() {
                       }
                     }}
                   />
+                  {m === "CREDIT" && toPaise(payments.CREDIT || 0) > 0 && !customer ? (
+                    <p className="mt-1 text-xs text-warning">
+                      Needs a customer - select one above.
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -1078,14 +1061,23 @@ function Billing() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
+            {blockingIssue ? (
+              <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
+                {blockingIssue}
+              </p>
+            ) : null}
             <div className="mt-4 grid gap-2">
-              <Button size="lg" disabled={busy || !cart.length} onClick={() => void save(true)}>
+              <Button
+                size="lg"
+                disabled={busy || !cart.length || !!blockingIssue}
+                onClick={() => void save(true)}
+              >
                 <Printer className="mr-2 h-4 w-4" /> Save &amp; print
                 <span className="kbd-hint ml-2">F9</span>
               </Button>
               <Button
                 variant="outline"
-                disabled={busy || !cart.length}
+                disabled={busy || !cart.length || !!blockingIssue}
                 onClick={() => void save(false)}
               >
                 <Save className="mr-2 h-4 w-4" /> Save only

@@ -18,8 +18,6 @@ export interface BillLineInput {
   qty: number;
   price: number;
   discount: number;
-  /** Informational only for a "KG"-priced product - never affects the amount. */
-  pieces?: number | null;
 }
 
 export interface BillPaymentInput {
@@ -269,7 +267,7 @@ export function saveBill(input: SaveBillInput): { saleId: number; invoiceNumber:
           p.hsn,
           p.unit,
           p.pricing_type,
-          l.pieces ?? null,
+          null,
           l.qty,
           l.price,
           t.discount,

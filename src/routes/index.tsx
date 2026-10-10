@@ -3,6 +3,8 @@ import { useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
+  Eye,
+  EyeOff,
   IndianRupee,
   Package,
   PackageCheck,
@@ -49,6 +51,11 @@ function Home() {
     [settings.creditInvoicePendingDays],
   );
   const [viewId, setViewId] = useState<number | null>(null);
+  // Hidden by default every time this page loads - so someone glancing at
+  // the screen can't read the day's money without a deliberate tap to reveal.
+  const [hidden, setHidden] = useState(true);
+  const maskMoney = (real: string) => (hidden ? "₹ XXXX" : real);
+  const maskNum = (real: string | number) => (hidden ? "XXXX" : String(real));
 
   return (
     <div className="min-h-screen">
@@ -61,11 +68,21 @@ function Home() {
           year: "numeric",
         })}
         actions={
-          <Button asChild size="lg">
-            <Link to="/billing">
-              New bill <span className="kbd-hint ml-2">F2</span>
-            </Link>
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              title={hidden ? "Show numbers" : "Hide numbers"}
+              onClick={() => setHidden((h) => !h)}
+            >
+              {hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            </Button>
+            <Button asChild size="lg">
+              <Link to="/billing">
+                New bill <span className="kbd-hint ml-2">F2</span>
+              </Link>
+            </Button>
+          </>
         }
       />
 
@@ -74,26 +91,30 @@ function Home() {
           <Stat
             icon={IndianRupee}
             label="Today's sales"
-            value={rupees(summary?.sales ?? 0)}
-            hint={`${summary?.bills ?? 0} bills · ${formatQty(summary?.itemsSold ?? 0)} items`}
+            value={maskMoney(rupees(summary?.sales ?? 0))}
+            hint={maskNum(
+              `${summary?.bills ?? 0} bills · ${formatQty(summary?.itemsSold ?? 0)} items`,
+            )}
           />
           <Stat
             icon={ReceiptText}
             label="Cash collected today"
-            value={rupees(summary?.cash ?? 0)}
-            hint={`UPI ${rupeesShort(summary?.upi ?? 0)} · Card ${rupeesShort(summary?.card ?? 0)}`}
+            value={maskMoney(rupees(summary?.cash ?? 0))}
+            hint={maskNum(
+              `UPI ${rupeesShort(summary?.upi ?? 0)} · Card ${rupeesShort(summary?.card ?? 0)}`,
+            )}
           />
           <Stat
             icon={Users}
             label="Customer dues"
-            value={rupees(summary?.customerOutstanding ?? 0)}
-            hint={`On credit today ${rupeesShort(summary?.credit ?? 0)}`}
+            value={maskMoney(rupees(summary?.customerOutstanding ?? 0))}
+            hint={maskNum(`On credit today ${rupeesShort(summary?.credit ?? 0)}`)}
           />
           <Stat
             icon={Package}
             label="Stock value (cost)"
-            value={rupees(stock?.cost ?? 0)}
-            hint={`Selling value ${rupeesShort(stock?.retail ?? 0)}`}
+            value={maskMoney(rupees(stock?.cost ?? 0))}
+            hint={maskNum(`Selling value ${rupeesShort(stock?.retail ?? 0)}`)}
           />
           <Link
             to="/credit-invoices"
@@ -103,10 +124,10 @@ function Home() {
               <PackageCheck className="h-4 w-4" /> Pending deliveries
             </div>
             <div className="num mt-2 text-2xl font-semibold tracking-tight">
-              {pending?.total ?? 0}
+              {maskNum(pending?.total ?? 0)}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
-              {pending?.overdue ? `${pending.overdue} overdue` : "All within schedule"}
+              {maskNum(pending?.overdue ? `${pending.overdue} overdue` : "All within schedule")}
             </div>
           </Link>
         </div>
@@ -147,7 +168,7 @@ function Home() {
                         {s.status === "CANCELLED" ? (
                           <span className="text-destructive">Cancelled</span>
                         ) : (
-                          rupees(s.total)
+                          maskMoney(rupees(s.total))
                         )}
                       </td>
                     </tr>
@@ -184,10 +205,10 @@ function Home() {
                       </td>
                       <td className="num px-5 py-2.5">
                         <span className={p.stock <= 0 ? "text-destructive" : "text-warning"}>
-                          {formatQty(p.stock)} {p.unit}
+                          {maskNum(`${formatQty(p.stock)} ${p.unit}`)}
                         </span>
                         <div className="text-xs text-muted-foreground">
-                          min {formatQty(p.min_stock)}
+                          {maskNum(`min ${formatQty(p.min_stock)}`)}
                         </div>
                       </td>
                     </tr>
