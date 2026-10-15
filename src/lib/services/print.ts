@@ -259,7 +259,7 @@ export function invoiceHtmlThermal(
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(sale.invoice_number)}</title>
 <style>
   @page { size: 80mm auto; margin: 3mm; }
-  body { font-family: "Courier New", monospace; font-size: 11px; width: 74mm; color: #000; }
+  body { font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size: 11px; width: 74mm; color: #000; }
   .c { text-align: center; } .n { text-align: right; }
   table { width: 100%; border-collapse: collapse; }
   hr { border: none; border-top: 1px dashed #000; }
