@@ -41,6 +41,7 @@ jobs:
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
+        continue-on-error: true # the GitHub Release below is the real distribution channel - never let an Actions storage quota hiccup here block it
         with:
           name: Unizo-Windows-${{ github.run_number }}
           path: release/*.exe
