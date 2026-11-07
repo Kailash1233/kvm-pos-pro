@@ -242,6 +242,12 @@ ${d.outstanding ? `<div style="margin-top:4px"><b>Total outstanding for this cus
 </body></html>`;
 }
 
+/** Fixed feedback footer shown on every thermal bill - not business-settings-driven, scoped to this template only. */
+const FEEDBACK_PHONE = "+91 91507 51905";
+const FEEDBACK_WEB = "www.kvmagencies.in";
+const FEEDBACK_QR_DATA_URI =
+  "data:image/png;base64,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";
+
 export function invoiceHtmlThermal(
   d: InvoiceData,
   s: BusinessSettings,
@@ -259,11 +265,11 @@ export function invoiceHtmlThermal(
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(sale.invoice_number)}</title>
 <style>
   @page { size: 80mm auto; margin: 3mm; }
-  body { font-family: Calibri, "Segoe UI", Arial, sans-serif; font-weight: 600; font-size: 11px; width: 74mm; color: #000; }
+  body { font-family: Calibri, "Segoe UI", Arial, sans-serif; font-weight: 600; font-size: 13px; width: 74mm; color: #000; }
   .c { text-align: center; } .n { text-align: right; }
   table { width: 100%; border-collapse: collapse; }
   hr { border: none; border-top: 1px dashed #000; }
-  .big { font-size: 15px; font-weight: bold; }
+  .big { font-size: 18px; font-weight: bold; }
 </style></head><body>
 <div class="c big">${esc(s.businessName)}</div>
 <div class="c">${esc(s.address)}</div>
@@ -298,6 +304,10 @@ ${
 </table>
 <hr>
 <div class="c">${esc(s.invoiceFooter || "Thank you, visit again!")}</div>
+<div class="c">Thank You and Visit Again Ph: ${esc(FEEDBACK_PHONE)}</div>
+<div class="c">Web: ${esc(FEEDBACK_WEB)}</div>
+<div class="c" style="margin-top:6px"><img src="${FEEDBACK_QR_DATA_URI}" alt="" style="width:100px;height:100px;"></div>
+<div class="c">Please scan and provide your feedback</div>
 </body></html>`;
 }
 
